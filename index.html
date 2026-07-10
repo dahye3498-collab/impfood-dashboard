@@ -128,6 +128,24 @@
   .fta-row .fill.over { background: var(--critical); }
   .fta-row .info { color: var(--text-secondary); font-variant-numeric: tabular-nums; font-size: 12.5px; text-align: right; }
   .empty { color: var(--text-muted); font-size: 13px; padding: 30px 0; text-align: center; }
+
+  .ai-box { display: flex; gap: 8px; margin-top: 12px; align-items: stretch; }
+  .ai-box textarea {
+    flex: 1; font: inherit; font-size: 13px; color: var(--text-primary);
+    background: var(--page); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; resize: vertical; min-height: 40px;
+  }
+  .ai-box button {
+    font: inherit; font-size: 13px; font-weight: 600; color: #fff;
+    background: var(--seq-450); border: none; border-radius: 8px;
+    padding: 0 18px; cursor: pointer;
+  }
+  .ai-box button:disabled { opacity: 0.5; cursor: default; }
+  .ai-answer {
+    margin-top: 12px; padding: 12px 14px; font-size: 13.5px; line-height: 1.65;
+    background: var(--page); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text-primary); white-space: pre-wrap;
+  }
   footer { color: var(--text-muted); font-size: 12px; margin-top: 24px; text-align: center; }
 </style>
 </head>
@@ -186,6 +204,16 @@
     <div class="fta-rows" id="fta-rows"></div>
   </div>
 
+  <div class="card" id="ai-card" style="display:none">
+    <h2>AI에게 질문</h2>
+    <div class="sub">현재 필터로 보고 있는 데이터 요약이 질문에 자동으로 첨부됩니다</div>
+    <div class="ai-box">
+      <textarea id="ai-q" rows="2" placeholder="예: 최근 호주산 물량 추세가 어때? 작년이랑 비교해줘"></textarea>
+      <button id="ai-send">질문</button>
+    </div>
+    <div id="ai-answer" class="ai-answer" style="display:none"></div>
+  </div>
+
   <footer>자료: 식약처 수입식품정보(impfood.mfds.go.kr) · 매월 1일·15일 자동 수집</footer>
 </div>
 
@@ -207,7 +235,9 @@ async function load() {
   // 레코드: [품명, 구분, 부위, 국가, kg, 월] + 연도를 붙여 [.., 연도]
   for (const f of files) for (const r of f.records) S.records.push([...r, f.year]);
   try { S.fta = await (await fetch('data/fta.json')).json(); } catch (e) { S.fta = null; }
+  try { S.config = await (await fetch('data/config.json')).json(); } catch (e) { S.config = {}; }
   initFilters();
+  initAi();
   renderAll();
 }
 
@@ -552,6 +582,70 @@ function renderFta() {
       <div class="info">${pct !== null ? `${pct}%${over ? ' ⚠ 초과' : ''} 사용` : '사용률 미입력'} · 기준 ${fmtInt.format(d.quota_mt)} MT${d.remaining_mt ? ` · 잔여 ${fmtInt.format(d.remaining_mt)}` : ''}</div>
     </div>`;
   }).join('');
+}
+
+// ---------------------------------------------------------------- AI 질문
+// 키는 클라이언트에 두지 않는다 — GAS 웹앱(action=ai)이 서버측에서 OpenAI를 호출.
+function buildAiContext() {
+  const recs = filtered();
+  const ym = sumByYearMonth(recs);
+  const last = latestYm(ym);
+  if (!last) return '';
+  const parts = [`[데이터 요약] 품명=${F.prod}${F.gubun ? ', 구분=' + F.gubun : ''}${F.part ? ', 부위=' + F.part : ''}${F.country ? ', 국가=' + F.country : ''} (단위: 톤, 자료: 식약처 수입검역)`];
+
+  const years = uniq(recs.map(r => r[6])).sort((a, b) => a - b).slice(-3);
+  for (const y of years) {
+    const ms = [];
+    for (let m = 1; m <= 12; m++) {
+      const v = ym.get(y * 100 + m);
+      if (v !== undefined) ms.push(`${m}월 ${Math.round(v / 1000)}`);
+    }
+    parts.push(`${y}년: ${ms.join(', ')}`);
+  }
+
+  const byCountry = new Map();
+  let k = last;
+  const window = new Set();
+  for (let i = 0; i < 12; i++) { window.add(k); k = prevYm(k); }
+  for (const r of filtered(true)) {
+    if (window.has(r[6] * 100 + r[5])) byCountry.set(r[3], (byCountry.get(r[3]) ?? 0) + r[4]);
+  }
+  const top = [...byCountry.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6)
+    .map(([c, v]) => `${c} ${Math.round(v / 1000)}`).join(', ');
+  if (top) parts.push(`최근 12개월 국가별: ${top}`);
+  return parts.join('\n');
+}
+
+function initAi() {
+  const endpoint = S.config?.ai_endpoint;
+  if (!endpoint) return;
+  document.getElementById('ai-card').style.display = '';
+  const btn = document.getElementById('ai-send');
+  const qEl = document.getElementById('ai-q');
+  const ansEl = document.getElementById('ai-answer');
+
+  async function ask() {
+    const q = qEl.value.trim();
+    if (!q) return;
+    btn.disabled = true;
+    ansEl.style.display = '';
+    ansEl.textContent = '분석 중...';
+    try {
+      const prompt = buildAiContext() + '\n\n[질문] ' + q;
+      const url = endpoint + '?action=ai&prompt=' + encodeURIComponent(prompt);
+      const res = await fetch(url);
+      const json = await res.json();
+      const answer = json?.choices?.[0]?.message?.content
+        ?? json?.error?.message ?? json?.error ?? json?.message ?? '응답을 해석하지 못했습니다.';
+      ansEl.textContent = answer;
+    } catch (err) {
+      ansEl.textContent = '요청 실패: ' + err.message;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+  btn.onclick = ask;
+  qEl.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(); } };
 }
 
 load().catch(err => {
