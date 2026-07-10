@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>수입축산물 검역통계</title>
+<style>
+  :root {
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --series-1: #2a78d6;
+    --series-2: #1baf7a;
+    --series-3: #eda100;
+    --series-4: #008300;
+    --seq-250: #86b6ef;
+    --seq-450: #2a78d6;
+    --critical: #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface-1: #1a1a19;
+      --page: #0d0d0d;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255,255,255,0.10);
+      --series-1: #3987e5;
+      --series-2: #199e70;
+      --series-3: #c98500;
+      --series-4: #008300;
+      --seq-250: #184f95;
+      --seq-450: #3987e5;
+      --critical: #d03b3b;
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page);
+    color: var(--text-primary);
+    padding: 24px 16px 48px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  header h1 { font-size: 22px; font-weight: 700; }
+  header .meta { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+
+  .filters {
+    display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 16px;
+    align-items: center;
+  }
+  .filters label { font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+  .filters select {
+    font: inherit; font-size: 13px; color: var(--text-primary);
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 8px; min-width: 110px;
+  }
+  .filters button {
+    font: inherit; font-size: 13px; color: var(--text-secondary);
+    background: none; border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px 12px; cursor: pointer;
+  }
+  .filters button:hover { color: var(--text-primary); }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .tile {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 16px;
+  }
+  .tile .k { font-size: 12px; color: var(--text-muted); }
+  .tile .v { font-size: 24px; font-weight: 700; margin-top: 4px; }
+  .tile .d { font-size: 12px; margin-top: 2px; color: var(--text-secondary); }
+  .tile .d.up { color: var(--series-1); }
+  .tile .d.down { color: var(--critical); }
+
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px; margin-top: 16px;
+  }
+  .card h2 { font-size: 15px; font-weight: 600; }
+  .card .sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .row2 { grid-template-columns: 1fr; } }
+
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: var(--text-secondary); }
+  .legend .it { display: flex; align-items: center; gap: 5px; }
+  .legend .sw { width: 10px; height: 10px; border-radius: 3px; }
+
+  .chart-box { position: relative; margin-top: 8px; }
+  .chart-box svg { display: block; width: 100%; height: auto; }
+  .tooltip {
+    position: absolute; pointer-events: none; z-index: 10; display: none;
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; font-size: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12); min-width: 120px;
+  }
+  .tooltip .tt-title { font-weight: 600; margin-bottom: 4px; }
+  .tooltip .tt-row { display: flex; align-items: center; gap: 6px; justify-content: space-between; color: var(--text-secondary); }
+  .tooltip .tt-row .lft { display: flex; align-items: center; gap: 5px; }
+  .tooltip .tt-row b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+  .hbars { margin-top: 12px; display: flex; flex-direction: column; gap: 7px; }
+  .hbar { display: grid; grid-template-columns: 90px 1fr 86px; align-items: center; gap: 8px; font-size: 12.5px; }
+  .hbar .name { color: var(--text-secondary); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hbar .track { height: 18px; position: relative; }
+  .hbar .fill { height: 100%; border-radius: 0 4px 4px 0; background: var(--seq-450); min-width: 2px; }
+  .hbar .val { color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .hbar .val b { color: var(--text-primary); }
+
+  table.pivot { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+  table.pivot th, table.pivot td { padding: 6px 10px; text-align: right; font-variant-numeric: tabular-nums; }
+  table.pivot th { color: var(--text-muted); font-weight: 500; border-bottom: 1px solid var(--baseline); }
+  table.pivot td:first-child, table.pivot th:first-child { text-align: left; color: var(--text-secondary); }
+  table.pivot tr:not(:last-child) td { border-bottom: 1px solid var(--grid); }
+
+  .fta-rows { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .fta-row { display: grid; grid-template-columns: 48px 1fr 210px; gap: 10px; align-items: center; font-size: 13px; }
+  .fta-row .yr { color: var(--text-secondary); font-weight: 600; }
+  .fta-row .track { height: 14px; background: var(--grid); border-radius: 4px; overflow: hidden; }
+  .fta-row .fill { height: 100%; background: var(--seq-450); border-radius: 4px 0 0 4px; }
+  .fta-row .fill.over { background: var(--critical); }
+  .fta-row .info { color: var(--text-secondary); font-variant-numeric: tabular-nums; font-size: 12.5px; text-align: right; }
+  .empty { color: var(--text-muted); font-size: 13px; padding: 30px 0; text-align: center; }
+  footer { color: var(--text-muted); font-size: 12px; margin-top: 24px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>수입축산물 검역통계</h1>
+    <div class="meta" id="meta">데이터 불러오는 중...</div>
+  </header>
+
+  <div class="filters">
+    <label>품명 <select id="f-prod"></select></label>
+    <label>구분 <select id="f-gubun"></select></label>
+    <label>부위 <select id="f-part"></select></label>
+    <label>국가 <select id="f-country"></select></label>
+    <button id="f-reset">초기화</button>
+  </div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="card">
+    <h2>월별 검역량 추이</h2>
+    <div class="sub" id="trend-sub"></div>
+    <div class="legend" id="trend-legend"></div>
+    <div class="chart-box" id="trend-box">
+      <svg id="trend-svg" viewBox="0 0 1040 320"></svg>
+      <div class="tooltip" id="trend-tt"></div>
+    </div>
+  </div>
+
+  <div class="row2">
+    <div class="card">
+      <h2>국가별 검역량</h2>
+      <div class="sub" id="country-sub">최근 12개월 합계</div>
+      <div class="hbars" id="country-bars"></div>
+    </div>
+    <div class="card">
+      <h2>연도별 합계</h2>
+      <div class="sub" id="year-sub"></div>
+      <div class="chart-box" id="year-box">
+        <svg id="year-svg" viewBox="0 0 500 300"></svg>
+        <div class="tooltip" id="year-tt"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>월별 상세 (톤)</h2>
+    <div class="sub">위 추이 차트와 동일한 데이터의 표 보기</div>
+    <div style="overflow-x:auto"><table class="pivot" id="pivot"></table></div>
+  </div>
+
+  <div class="card" id="fta-card" style="display:none">
+    <h2>FTA 할당관세 사용률</h2>
+    <div class="sub">data/fta.json에서 수동 관리</div>
+    <div class="fta-rows" id="fta-rows"></div>
+  </div>
+
+  <footer>자료: 식약처 수입식품정보(impfood.mfds.go.kr) · 매월 1일·15일 자동 수집</footer>
+</div>
+
+<script>
+// ---------------------------------------------------------------- 데이터 로드
+const S = { records: [], years: [], fta: null, updatedAt: null };
+const F = { prod: '소정육', gubun: '', part: '', country: '' };  // ''=전체
+const SERIES_COLORS = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)'];
+
+const fmtInt = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 });
+const fmt1 = new Intl.NumberFormat('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+function tons(kg) { const t = kg / 1000; return t >= 100 ? fmtInt.format(t) : fmt1.format(t); }
+
+async function load() {
+  const manifest = await (await fetch('data/manifest.json')).json();
+  S.years = manifest.years;
+  S.updatedAt = manifest.updatedAt;
+  const files = await Promise.all(S.years.map(y => fetch(`data/quarantine-${y}.json`).then(r => r.json())));
+  // 레코드: [품명, 구분, 부위, 국가, kg, 월] + 연도를 붙여 [.., 연도]
+  for (const f of files) for (const r of f.records) S.records.push([...r, f.year]);
+  try { S.fta = await (await fetch('data/fta.json')).json(); } catch (e) { S.fta = null; }
+  initFilters();
+  renderAll();
+}
+
+// ---------------------------------------------------------------- 필터
+function uniq(arr) { return [...new Set(arr)]; }
+function fillSelect(el, options, value, allLabel) {
+  el.innerHTML = `<option value="">${allLabel}</option>` +
+    options.map(o => `<option value="${o}"${o === value ? ' selected' : ''}>${o}</option>`).join('');
+}
+
+function initFilters() {
+  const prods = uniq(S.records.map(r => r[0])).sort((a, b) => a.localeCompare(b, 'ko'));
+  const sel = document.getElementById('f-prod');
+  sel.innerHTML = prods.map(p => `<option value="${p}"${p === F.prod ? ' selected' : ''}>${p}</option>`).join('');
+  if (!prods.includes(F.prod)) F.prod = prods[0];
+  syncDependentFilters();
+
+  sel.onchange = () => { F.prod = sel.value; F.gubun = F.part = F.country = ''; syncDependentFilters(); renderAll(); };
+  document.getElementById('f-gubun').onchange = e => { F.gubun = e.target.value; renderAll(); };
+  document.getElementById('f-part').onchange = e => { F.part = e.target.value; renderAll(); };
+  document.getElementById('f-country').onchange = e => { F.country = e.target.value; renderAll(); };
+  document.getElementById('f-reset').onclick = () => { F.gubun = F.part = F.country = ''; syncDependentFilters(); renderAll(); };
+}
+
+function syncDependentFilters() {
+  const base = S.records.filter(r => r[0] === F.prod);
+  fillSelect(document.getElementById('f-gubun'), uniq(base.map(r => r[1])).sort(), F.gubun, '전체');
+  fillSelect(document.getElementById('f-part'), uniq(base.map(r => r[2])).sort((a, b) => a.localeCompare(b, 'ko')), F.part, '전체');
+  fillSelect(document.getElementById('f-country'), uniq(base.map(r => r[3])).sort((a, b) => a.localeCompare(b, 'ko')), F.country, '전체');
+}
+
+function filtered(ignoreCountry = false) {
+  return S.records.filter(r =>
+    r[0] === F.prod &&
+    (!F.gubun || r[1] === F.gubun) &&
+    (!F.part || r[2] === F.part) &&
+    (ignoreCountry || !F.country || r[3] === F.country)
+  );
+}
+
+// (연도, 월) → 합계 kg
+function sumByYearMonth(recs) {
+  const m = new Map();
+  for (const r of recs) {
+    const k = r[6] * 100 + r[5];
+    m.set(k, (m.get(k) ?? 0) + r[4]);
+  }
+  return m;
+}
+
+// ---------------------------------------------------------------- 렌더링
+function renderAll() {
+  const recs = filtered();
+  const ym = sumByYearMonth(recs);
+  const dataYears = uniq(recs.map(r => r[6])).sort((a, b) => a - b);
+  const trendYears = dataYears.slice(-4);          // 최근 4개 연도
+  renderTiles(ym, dataYears);
+  renderTrend(ym, trendYears);
+  renderPivot(ym, trendYears);
+  renderCountry();
+  renderYearly(ym, dataYears);
+  renderFta();
+  const last = latestYm(ym);
+  document.getElementById('meta').textContent =
+    `${last ? `최신 데이터: ${Math.floor(last / 100)}년 ${last % 100}월` : ''} · 갱신: ${new Date(S.updatedAt).toLocaleDateString('ko-KR')} · 자료: 식약처 수입식품정보`;
+}
+
+function latestYm(ym) {
+  let max = 0;
+  for (const k of ym.keys()) if (k > max) max = k;
+  return max || null;
+}
+function prevYm(k) { return k % 100 === 1 ? k - 89 : k - 1; }  // 1월 → 전년 12월
+
+function pctDelta(cur, prev) {
+  if (!prev) return null;
+  return (cur - prev) / prev * 100;
+}
+function deltaHtml(pct, label) {
+  if (pct === null) return `<div class="d">${label}: -</div>`;
+  const cls = pct >= 0 ? 'up' : 'down';
+  const sign = pct >= 0 ? '▲' : '▼';
+  return `<div class="d ${cls}">${label}: ${sign} ${Math.abs(pct).toFixed(1)}%</div>`;
+}
+
+function renderTiles(ym, dataYears) {
+  const box = document.getElementById('tiles');
+  const last = latestYm(ym);
+  if (!last) { box.innerHTML = '<div class="empty">선택한 조건의 데이터가 없습니다</div>'; return; }
+  const y = Math.floor(last / 100), m = last % 100;
+  const cur = ym.get(last) ?? 0;
+  const mom = pctDelta(cur, ym.get(prevYm(last)));
+  const yoy = pctDelta(cur, ym.get(last - 100));
+
+  let ytd = 0, ytdPrev = 0;
+  for (let i = 1; i <= m; i++) { ytd += ym.get(y * 100 + i) ?? 0; ytdPrev += ym.get((y - 1) * 100 + i) ?? 0; }
+  const ytdDelta = pctDelta(ytd, ytdPrev);
+
+  box.innerHTML = `
+    <div class="tile"><div class="k">${y}년 ${m}월 검역량</div><div class="v">${tons(cur)} t</div>${deltaHtml(mom, '전월 대비')}</div>
+    <div class="tile"><div class="k">전년 동월 (${y - 1}년 ${m}월)</div><div class="v">${ym.has(last - 100) ? tons(ym.get(last - 100)) + ' t' : '-'}</div>${deltaHtml(yoy, '전년 동월 대비')}</div>
+    <div class="tile"><div class="k">${y}년 누계 (1~${m}월)</div><div class="v">${tons(ytd)} t</div>${deltaHtml(ytdDelta, '전년 동기 대비')}</div>
+    <div class="tile"><div class="k">데이터 범위</div><div class="v" style="font-size:18px">${dataYears[0]} ~ ${dataYears[dataYears.length - 1]}년</div><div class="d">${fmtInt.format(filtered().length)}개 레코드</div></div>`;
+}
+
+// 눈금 계산
+function niceTicks(max, n = 4) {
+  if (max <= 0) return [0, 1];
+  const raw = max / n;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(x => x * mag).find(x => x >= raw);
+  const ticks = [];
+  for (let v = 0; v <= max + step * 0.001; v += step) ticks.push(v);
+  if (ticks[ticks.length - 1] < max) ticks.push(ticks[ticks.length - 1] + step);
+  return ticks;
+}
+
+// ---------------------------------------------------------------- 추이 라인차트
+const TREND = { W: 1040, H: 320, L: 64, R: 70, T: 16, B: 34 };
+let trendState = null; // {years, pts, xOf, yOf}
+
+function renderTrend(ym, years) {
+  const svg = document.getElementById('trend-svg');
+  const legend = document.getElementById('trend-legend');
+  document.getElementById('trend-sub').textContent = years.length ? `${years[0]}~${years[years.length - 1]}년 월별 비교 (톤)` : '';
+  if (!years.length) { svg.innerHTML = ''; legend.innerHTML = ''; trendState = null; return; }
+
+  const { W, H, L, R, T, B } = TREND;
+  const pw = W - L - R, ph = H - T - B;
+  let maxV = 0;
+  for (const y of years) for (let m = 1; m <= 12; m++) maxV = Math.max(maxV, ym.get(y * 100 + m) ?? 0);
+  const ticks = niceTicks(maxV / 1000);
+  const yMax = ticks[ticks.length - 1] * 1000;
+  const xOf = m => L + (m - 1) / 11 * pw;
+  const yOf = v => T + ph - v / yMax * ph;
+
+  let g = '';
+  for (const t of ticks) {
+    const y = yOf(t * 1000);
+    g += `<line x1="${L}" y1="${y}" x2="${W - R}" y2="${y}" stroke="var(--grid)" stroke-width="1"/>`;
+    g += `<text x="${L - 8}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--text-muted)">${fmtInt.format(t)}</text>`;
+  }
+  g += `<line x1="${L}" y1="${T + ph}" x2="${W - R}" y2="${T + ph}" stroke="var(--baseline)" stroke-width="1"/>`;
+  for (let m = 1; m <= 12; m++) {
+    g += `<text x="${xOf(m)}" y="${H - 12}" text-anchor="middle" font-size="11" fill="var(--text-muted)">${m}월</text>`;
+  }
+
+  const pts = new Map(); // year → [{m,v,x,y}]
+  years.forEach((yr, i) => {
+    const color = SERIES_COLORS[years.length - 1 - i]; // 최신 연도 = slot1
+    const arr = [];
+    for (let m = 1; m <= 12; m++) {
+      const v = ym.get(yr * 100 + m);
+      if (v !== undefined) arr.push({ m, v, x: xOf(m), y: yOf(v) });
+    }
+    pts.set(yr, { arr, color });
+    if (arr.length > 0) {
+      const d = arr.map((p, j) => `${j ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join('');
+      g += `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>`;
+      const lastP = arr[arr.length - 1];
+      g += `<circle cx="${lastP.x}" cy="${lastP.y}" r="3" fill="${color}"/>`;
+      g += `<text x="${lastP.x + 8}" y="${lastP.y + 4}" font-size="11.5" fill="var(--text-secondary)">${yr}</text>`;
+    }
+  });
+
+  g += `<line id="trend-cross" x1="0" y1="${T}" x2="0" y2="${T + ph}" stroke="var(--baseline)" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>`;
+  g += `<g id="trend-dots"></g>`;
+  svg.innerHTML = g;
+
+  legend.innerHTML = [...years].reverse().map((yr, i) =>
+    `<span class="it"><span class="sw" style="background:${SERIES_COLORS[i]}"></span>${yr}년</span>`).join('');
+
+  trendState = { years, pts, xOf, yOf };
+  bindTrendHover();
+}
+
+function bindTrendHover() {
+  const svg = document.getElementById('trend-svg');
+  const box = document.getElementById('trend-box');
+  const tt = document.getElementById('trend-tt');
+  svg.onmousemove = e => {
+    if (!trendState) return;
+    const rect = svg.getBoundingClientRect();
+    const sx = TREND.W / rect.width;
+    const px = (e.clientX - rect.left) * sx;
+    const m = Math.max(1, Math.min(12, Math.round((px - TREND.L) / (TREND.W - TREND.L - TREND.R) * 11 + 1)));
+    const x = trendState.xOf(m);
+    const cross = svg.querySelector('#trend-cross');
+    cross.setAttribute('x1', x); cross.setAttribute('x2', x);
+    cross.setAttribute('visibility', 'visible');
+
+    const dots = svg.querySelector('#trend-dots');
+    let dotHtml = '', rows = '';
+    [...trendState.years].reverse().forEach((yr, i) => {
+      const p = trendState.pts.get(yr).arr.find(p => p.m === m);
+      if (p) {
+        dotHtml += `<circle cx="${p.x}" cy="${p.y}" r="4.5" fill="${trendState.pts.get(yr).color}" stroke="var(--surface-1)" stroke-width="2"/>`;
+        rows += `<div class="tt-row"><span class="lft"><span class="sw" style="width:8px;height:8px;border-radius:2px;display:inline-block;background:${trendState.pts.get(yr).color}"></span>${yr}년</span><b>${tons(p.v)} t</b></div>`;
+      }
+    });
+    dots.innerHTML = dotHtml;
+    tt.innerHTML = `<div class="tt-title">${m}월</div>` + (rows || '<div class="tt-row">데이터 없음</div>');
+    tt.style.display = 'block';
+    const bw = box.clientWidth, tw = tt.offsetWidth;
+    let lx = (e.clientX - rect.left) + 14;
+    if (lx + tw > bw) lx = (e.clientX - rect.left) - tw - 14;
+    tt.style.left = lx + 'px';
+    tt.style.top = Math.max(0, e.clientY - rect.top - 20) + 'px';
+  };
+  svg.onmouseleave = () => {
+    tt.style.display = 'none';
+    svg.querySelector('#trend-cross')?.setAttribute('visibility', 'hidden');
+    const dots = svg.querySelector('#trend-dots'); if (dots) dots.innerHTML = '';
+  };
+}
+
+// ---------------------------------------------------------------- 표 보기
+function renderPivot(ym, years) {
+  const tbl = document.getElementById('pivot');
+  if (!years.length) { tbl.innerHTML = ''; return; }
+  let html = '<tr><th>월</th>' + years.map(y => `<th>${y}년</th>`).join('') + '</tr>';
+  for (let m = 1; m <= 12; m++) {
+    const cells = years.map(y => {
+      const v = ym.get(y * 100 + m);
+      return `<td>${v !== undefined ? tons(v) : '-'}</td>`;
+    });
+    html += `<tr><td>${m}월</td>${cells.join('')}</tr>`;
+  }
+  tbl.innerHTML = html;
+}
+
+// ---------------------------------------------------------------- 국가별 바
+function renderCountry() {
+  const box = document.getElementById('country-bars');
+  const recs = filtered(true); // 국가 필터 무시
+  const ym = sumByYearMonth(recs);
+  const last = latestYm(ym);
+  if (!last) { box.innerHTML = '<div class="empty">데이터 없음</div>'; return; }
+
+  // 최근 12개월 창
+  const window = new Set();
+  let k = last;
+  for (let i = 0; i < 12; i++) { window.add(k); k = prevYm(k); }
+
+  const byCountry = new Map();
+  let total = 0;
+  for (const r of recs) {
+    const key = r[6] * 100 + r[5];
+    if (!window.has(key)) continue;
+    byCountry.set(r[3], (byCountry.get(r[3]) ?? 0) + r[4]);
+    total += r[4];
+  }
+  const sorted = [...byCountry.entries()].sort((a, b) => b[1] - a[1]);
+  const top = sorted.slice(0, 10);
+  const rest = sorted.slice(10).reduce((s, e) => s + e[1], 0);
+  if (rest > 0) top.push(['기타', rest]);
+  const maxV = top[0]?.[1] ?? 1;
+
+  let start = last;
+  for (let i = 0; i < 11; i++) start = prevYm(start);
+  document.getElementById('country-sub').textContent =
+    `최근 12개월 합계 (${Math.floor(start / 100)}년 ${start % 100}월 ~ ${Math.floor(last / 100)}년 ${last % 100}월)`;
+
+  box.innerHTML = top.map(([name, v]) => `
+    <div class="hbar" title="${name}: ${tons(v)} t (${(v / total * 100).toFixed(1)}%)">
+      <div class="name">${name}</div>
+      <div class="track"><div class="fill" style="width:${Math.max(1, v / maxV * 100)}%; ${name === '기타' ? 'background:var(--baseline)' : ''}"></div></div>
+      <div class="val"><b>${tons(v)}</b> t · ${(v / total * 100).toFixed(1)}%</div>
+    </div>`).join('');
+}
+
+// ---------------------------------------------------------------- 연도별 바
+function renderYearly(ym, dataYears) {
+  const svg = document.getElementById('year-svg');
+  const tt = document.getElementById('year-tt');
+  if (!dataYears.length) { svg.innerHTML = ''; return; }
+
+  const totals = dataYears.map(y => {
+    let s = 0, months = 0;
+    for (let m = 1; m <= 12; m++) { const v = ym.get(y * 100 + m); if (v !== undefined) { s += v; months++; } }
+    return { y, s, months };
+  });
+  const lastEntry = totals[totals.length - 1];
+  const partial = lastEntry.months < 12;
+  document.getElementById('year-sub').textContent = partial ? `${lastEntry.y}년은 1~${lastEntry.months}월 누계` : '';
+
+  const W = 500, H = 300, L = 56, R = 8, T = 14, B = 32;
+  const pw = W - L - R, ph = H - T - B;
+  const maxV = Math.max(...totals.map(t => t.s));
+  const ticks = niceTicks(maxV / 1000);
+  const yMax = ticks[ticks.length - 1] * 1000;
+  const n = totals.length;
+  const slot = pw / n;
+  const bw = Math.min(34, slot - 2); // 바 사이 최소 2px 간격
+
+  let g = '';
+  for (const t of ticks) {
+    const y = T + ph - t * 1000 / yMax * ph;
+    g += `<line x1="${L}" y1="${y}" x2="${W - R}" y2="${y}" stroke="var(--grid)" stroke-width="1"/>`;
+    g += `<text x="${L - 6}" y="${y + 4}" text-anchor="end" font-size="10.5" fill="var(--text-muted)">${fmtInt.format(t)}</text>`;
+  }
+  totals.forEach((t, i) => {
+    const x = L + slot * i + (slot - bw) / 2;
+    const h = Math.max(1, t.s / yMax * ph);
+    const y = T + ph - h;
+    const fill = (partial && i === n - 1) ? 'var(--seq-250)' : 'var(--seq-450)';
+    g += `<path d="M${x},${y + 4} q0,-4 4,-4 h${bw - 8} q4,0 4,4 v${h - 4} h${-bw} z" fill="${fill}" data-i="${i}"/>`;
+    if (i % 2 === 0 || n <= 8) g += `<text x="${x + bw / 2}" y="${H - 12}" text-anchor="middle" font-size="10.5" fill="var(--text-muted)">${String(t.y).slice(2)}</text>`;
+  });
+  g += `<line x1="${L}" y1="${T + ph}" x2="${W - R}" y2="${T + ph}" stroke="var(--baseline)" stroke-width="1"/>`;
+  svg.innerHTML = g;
+
+  svg.onmousemove = e => {
+    const el = e.target.closest('path[data-i]');
+    if (!el) { tt.style.display = 'none'; return; }
+    const t = totals[Number(el.dataset.i)];
+    tt.innerHTML = `<div class="tt-title">${t.y}년${t.months < 12 ? ` (1~${t.months}월)` : ''}</div><div class="tt-row"><span>합계</span><b>${tons(t.s)} t</b></div>`;
+    tt.style.display = 'block';
+    const rect = document.getElementById('year-box').getBoundingClientRect();
+    let lx = e.clientX - rect.left + 12;
+    if (lx + tt.offsetWidth > rect.width) lx = e.clientX - rect.left - tt.offsetWidth - 12;
+    tt.style.left = lx + 'px';
+    tt.style.top = (e.clientY - rect.top - 40) + 'px';
+  };
+  svg.onmouseleave = () => { tt.style.display = 'none'; };
+}
+
+// ---------------------------------------------------------------- FTA
+function renderFta() {
+  if (!S.fta) return;
+  const years = Object.keys(S.fta).filter(k => /^\d{4}$/.test(k)).sort();
+  if (!years.length) return;
+  document.getElementById('fta-card').style.display = '';
+  document.getElementById('fta-rows').innerHTML = years.map(y => {
+    const d = S.fta[y];
+    const pct = d.usage_pct;
+    const over = pct !== null && pct > 100;
+    const width = pct === null ? 0 : Math.min(100, pct);
+    return `<div class="fta-row">
+      <div class="yr">${y}</div>
+      <div class="track"><div class="fill${over ? ' over' : ''}" style="width:${width}%"></div></div>
+      <div class="info">${pct !== null ? `${pct}%${over ? ' ⚠ 초과' : ''} 사용` : '사용률 미입력'} · 기준 ${fmtInt.format(d.quota_mt)} MT${d.remaining_mt ? ` · 잔여 ${fmtInt.format(d.remaining_mt)}` : ''}</div>
+    </div>`;
+  }).join('');
+}
+
+load().catch(err => {
+  document.getElementById('meta').textContent = '데이터 로드 실패: ' + err.message;
+});
+</script>
+</body>
+</html>

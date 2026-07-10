@@ -1,0 +1,7 @@
+{
+  "_설명": "FTA 할당관세 데이터 — 이 파일은 수동으로 관리합니다. GitHub에서 직접 수정하거나 로컬에서 수정 후 커밋하세요.",
+  "2023": { "quota_mt": 184792, "remaining_mt": 0, "usage_pct": null },
+  "2024": { "quota_mt": 188414, "remaining_mt": 0, "usage_pct": null },
+  "2025": { "quota_mt": 192206, "remaining_mt": 0, "usage_pct": 116.8 },
+  "2026": { "quota_mt": 196050, "remaining_mt": 14612.44, "usage_pct": 92.55 }
+}
