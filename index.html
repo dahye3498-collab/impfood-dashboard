@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>수입축산물 검역통계</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2224%22 fill=%22%235a9874%22/><text x=%2250%22 y=%2268%22 font-size=%2252%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22sans-serif%22 font-weight=%22bold%22>검</text></svg>">
 <style>
   /* ============================================================
      유쾌한프로젝트 디자인 언어 (Sage) — A안 클래식
@@ -67,14 +68,14 @@
     border-bottom: 1px solid var(--line);
     position: sticky; top: 0; z-index: 50;
   }
-  .appbar .brand { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; display: inline-flex; align-items: center; gap: 9px; }
+  .appbar .brand { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; display: inline-flex; align-items: center; gap: 9px; white-space: nowrap; }
   .appbar .brand .mark {
     width: 26px; height: 26px; border-radius: 8px; background: var(--accent); color: #fff;
     display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700;
   }
   .appbar .brand .hl { color: var(--accent-text); }
   .appbar .spacer { flex: 1; }
-  .appbar .meta { color: var(--text-3); font-size: 12px; font-family: var(--font-mono); }
+  .appbar .meta { color: var(--text-3); font-size: 12px; font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; margin-left: 12px; }
 
   .wrap { max-width: 1280px; margin: 0 auto; padding: 16px 24px 44px; }
 
@@ -169,6 +170,7 @@
   .hbar .fill.etc { background: var(--line-strong); }
   .hbar .val { color: var(--text-3); font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 12px; text-align: right; }
   .hbar .val b { color: var(--text-1); }
+  .hbar .val .pct { display: inline-block; min-width: 46px; text-align: right; color: var(--text-3); }
 
   /* ----- 피벗 테이블 ----- */
   .tbl-scroll { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--line); margin-top: 10px; }
@@ -185,12 +187,16 @@
   }
   table.dt tbody tr:hover td { background: var(--bg-soft); }
   table.dt tr:last-child td { border-bottom: none; }
+  table.dt tr.cur td { background: var(--accent-soft); font-weight: 600; }
+  table.dt tr.cur td.l::after { content: " ●"; color: var(--accent); font-size: 8px; vertical-align: 2px; }
+  table.dt td.na { color: var(--text-4); }
 
   /* ----- FTA ----- */
   .fta-rows { margin-top: 10px; display: flex; flex-direction: column; gap: 7px; }
   .fta-row { display: grid; grid-template-columns: 52px 1fr 250px; gap: 10px; align-items: center; font-size: 13px; }
   .fta-row .yr { color: var(--text-1); font-weight: 600; font-family: var(--font-mono); }
   .fta-row .track { height: 12px; background: var(--bg-sub); border-radius: var(--radius-pill); overflow: hidden; }
+  .fta-row .track.na { background: none; border: 1px dashed var(--line-strong); }
   .fta-row .fill { height: 100%; border-radius: var(--radius-pill); background: var(--accent); }
   .fta-row .fill.over { background: var(--danger); }
   .fta-row .info { color: var(--text-2); font-variant-numeric: tabular-nums; font-size: 12px; text-align: right; }
@@ -221,7 +227,7 @@
 </head>
 <body>
 <div class="appbar">
-  <div class="brand"><span class="mark">검</span>수입축산물&nbsp;<span class="hl">검역통계</span></div>
+  <div class="brand"><span class="mark">검</span><span class="hl">검역통계</span></div>
   <div class="spacer"></div>
   <div class="meta" id="meta">데이터 불러오는 중...</div>
 </div>
@@ -468,11 +474,14 @@ function renderTrend(ym, years) {
     g += `<text x="${L - 8}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--text-3)" font-family="DM Mono, monospace">${fmtInt.format(t)}</text>`;
   }
   g += `<line x1="${L}" y1="${T + ph}" x2="${W - R}" y2="${T + ph}" stroke="var(--line-strong)" stroke-width="1"/>`;
-  for (let m = 1; m <= 12; m++) {
+  // 좁은 화면에서는 홀수 달만 표기 (라벨 겹침 방지)
+  const mStep = W < 560 ? 2 : 1;
+  for (let m = 1; m <= 12; m += mStep) {
     g += `<text x="${xOf(m)}" y="${H - 12}" text-anchor="middle" font-size="11" fill="var(--text-3)">${m}월</text>`;
   }
 
   const pts = new Map(); // year → {arr, color}
+  const endLabels = [];
   years.forEach((yr, i) => {
     const color = SERIES_COLORS[years.length - 1 - i]; // 최신 연도 = slot1
     const isNewest = i === years.length - 1;
@@ -492,10 +501,33 @@ function renderTrend(ym, years) {
       for (const p of arr) g += `<circle cx="${p.x}" cy="${p.y}" r="2.2" fill="${color}"/>`;
       const lastP = arr[arr.length - 1];
       g += `<circle cx="${lastP.x}" cy="${lastP.y}" r="3.2" fill="${color}"/>`;
-      g += `<text x="${lastP.x + 9}" y="${lastP.y + 4}" font-size="11" fill="var(--text-2)" font-family="DM Mono, monospace">${yr}</text>`;
-      if (isNewest) g += `<text x="${lastP.x + 9}" y="${lastP.y + 20}" font-size="11" font-weight="600" fill="var(--accent-text)" font-family="DM Mono, monospace">${tons(lastP.v)}</text>`;
+      endLabels.push({ x: lastP.x, y: lastP.y, yr, isNewest, v: lastP.v });
     }
   });
+
+  // 라인 끝 연도 라벨 — x가 비슷한 라벨끼리는 세로 간격 13px 이상 확보 (겹침 방지)
+  const HALO = 'stroke="var(--surface)" stroke-width="3" paint-order="stroke"';
+  const groups = new Map();
+  for (const lb of endLabels) {
+    const gx = Math.round(lb.x / 30);
+    if (!groups.has(gx)) groups.set(gx, []);
+    groups.get(gx).push(lb);
+  }
+  for (const grp of groups.values()) {
+    grp.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < grp.length; i++) {
+      if (grp[i].y < grp[i - 1].y + 13) grp[i].y = grp[i - 1].y + 13;
+    }
+    for (let i = grp.length - 1; i >= 0; i--) {
+      const maxY = T + ph - (grp.length - 1 - i) * 13;
+      if (grp[i].y > maxY) grp[i].y = maxY;
+      if (i < grp.length - 1 && grp[i].y > grp[i + 1].y - 13) grp[i].y = grp[i + 1].y - 13;
+    }
+  }
+  for (const lb of endLabels) {
+    g += `<text x="${lb.x + 9}" y="${lb.y + 4}" font-size="11" fill="var(--text-2)" font-family="DM Mono, monospace" ${HALO}>${lb.yr}</text>`;
+    if (lb.isNewest) g += `<text x="${lb.x + 9}" y="${lb.y + 20}" font-size="11" font-weight="600" fill="var(--accent-text)" font-family="DM Mono, monospace" ${HALO}>${tons(lb.v)}</text>`;
+  }
 
   g += `<line id="trend-cross" x1="0" y1="${T}" x2="0" y2="${T + ph}" stroke="var(--line-strong)" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>`;
   g += `<g id="trend-dots"></g>`;
@@ -552,13 +584,15 @@ function bindTrendHover() {
 function renderPivot(ym, years) {
   const tbl = document.getElementById('pivot');
   if (!years.length) { tbl.innerHTML = ''; return; }
+  const last = latestYm(ym);
   let html = '<tr><th class="l">월</th>' + years.map(y => `<th>${y}년</th>`).join('') + '</tr>';
   for (let m = 1; m <= 12; m++) {
+    const isCur = last !== null && m === last % 100;
     const cells = years.map(y => {
       const v = ym.get(y * 100 + m);
-      return `<td>${v !== undefined ? tons(v) : '-'}</td>`;
+      return `<td${v === undefined ? ' class="na"' : ''}>${v !== undefined ? tons(v) : '–'}</td>`;
     });
-    html += `<tr><td class="l">${m}월</td>${cells.join('')}</tr>`;
+    html += `<tr${isCur ? ' class="cur"' : ''}><td class="l">${m}월</td>${cells.join('')}</tr>`;
   }
   tbl.innerHTML = html;
 }
@@ -599,7 +633,7 @@ function renderCountry() {
     <div class="hbar" title="${name}: ${tons(v)} t (${(v / total * 100).toFixed(1)}%)">
       <div class="name">${name}</div>
       <div class="track"><div class="fill${name === '기타' ? ' etc' : ''}" style="width:${Math.max(1, v / maxV * 100)}%"></div></div>
-      <div class="val"><b>${tons(v)}</b> t · ${(v / total * 100).toFixed(1)}%</div>
+      <div class="val"><b>${tons(v)}</b> t<span class="pct">${(v / total * 100).toFixed(1)}%</span></div>
     </div>`).join('');
 }
 
@@ -642,8 +676,11 @@ function renderYearly(ym, dataYears) {
     const y = T + ph - h;
     const fill = (partial && i === n - 1) ? 'var(--accent-soft-2)' : 'var(--accent)';
     g += `<path d="M${x},${y + 4} q0,-4 4,-4 h${bw - 8} q4,0 4,4 v${h - 4} h${-bw} z" fill="${fill}" data-i="${i}"/>`;
+    // 연도 눈금은 격년, 값 라벨은 공간이 되면 전부(일관성) — 좁으면 마지막 바에만
     if (i % 2 === 0 || n <= 8) {
       g += `<text x="${x + bw / 2}" y="${H - 12}" text-anchor="middle" font-size="10.5" fill="var(--text-3)" font-family="DM Mono, monospace">${String(t.y).slice(2)}</text>`;
+    }
+    if (slot >= 48 || i === n - 1) {
       g += `<text x="${x + bw / 2}" y="${Math.max(11, y - 6)}" text-anchor="middle" font-size="10" fill="var(--text-2)" font-family="DM Mono, monospace">${tons(t.s)}</text>`;
     }
   });
@@ -676,9 +713,10 @@ function renderFta() {
     const pct = d.usage_pct;
     const over = pct !== null && pct > 100;
     const width = pct === null ? 0 : Math.min(100, pct);
+    // 미입력 연도는 빈 점선 트랙으로 — 꽉 찬 회색 바(0%나 100%처럼 보임)와 구분
     return `<div class="fta-row">
       <div class="yr">${y}</div>
-      <div class="track"><div class="fill${over ? ' over' : ''}" style="width:${width}%"></div></div>
+      <div class="track${pct === null ? ' na' : ''}">${pct !== null ? `<div class="fill${over ? ' over' : ''}" style="width:${width}%"></div>` : ''}</div>
       <div class="info">${pct !== null ? `${pct}%${over ? ' ⚠ 초과' : ''} 사용` : '사용률 미입력'} · 기준 ${fmtInt.format(d.quota_mt)} MT${d.remaining_mt ? ` · 잔여 ${fmtInt.format(d.remaining_mt)}` : ''}</div>
     </div>`;
   }).join('');
