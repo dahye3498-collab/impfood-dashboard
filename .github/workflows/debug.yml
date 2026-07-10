@@ -1,0 +1,25 @@
+name: 연결 진단
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: curl 진단
+        run: |
+          echo "--- runner IP ---"
+          curl -s https://api.ipify.org || true
+          echo ""
+          echo "--- DNS ---"
+          nslookup impfood.mfds.go.kr || true
+          echo "--- TCP/TLS 진단 ---"
+          curl -sv --max-time 25 -X POST "https://impfood.mfds.go.kr/ifs/CFSBB01F150/getUnionReceiptList.action" \
+            -H "Content-Type: application/json; charset=UTF-8" \
+            -H "Accept: application/json" \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126.0" \
+            -H "X-Requested-With: XMLHttpRequest" \
+            -H "Referer: https://impfood.mfds.go.kr/" \
+            -d '{"dma_search":{"insttCd":"","startDate":"20260601","endDate":"20260630","prodSsnm":"","prodSssnm":"","prodKnd":"","ntncd":"","ntncdList":[]}}' \
+            -o /tmp/out.json 2>&1 | tail -30 || true
+          echo "--- 응답 크기 ---"
+          wc -c /tmp/out.json 2>/dev/null || echo "no response"
+          head -c 300 /tmp/out.json 2>/dev/null || true
