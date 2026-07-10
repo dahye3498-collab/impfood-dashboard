@@ -5,173 +5,250 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>수입축산물 검역통계</title>
 <style>
+  /* ============================================================
+     유쾌한프로젝트 디자인 언어 (Sage) — A안 클래식
+     기존 index.html 대체용 · 빌드 불필요 · GitHub Pages 호환
+     ============================================================ */
+  /* Pretendard는 Google Fonts에 없음 — 공식 CDN 사용 */
+  @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap');
+
   :root {
-    --surface-1: #fcfcfb;
-    --page: #f9f9f7;
-    --text-primary: #0b0b0b;
-    --text-secondary: #52514e;
-    --text-muted: #898781;
-    --grid: #e1e0d9;
-    --baseline: #c3c2b7;
-    --border: rgba(11,11,11,0.10);
-    --series-1: #2a78d6;
-    --series-2: #1baf7a;
-    --series-3: #eda100;
-    --series-4: #008300;
-    --seq-250: #86b6ef;
-    --seq-450: #2a78d6;
-    --critical: #d03b3b;
+    /* 표면 (warm off-white) */
+    --bg:          #fbfaf7;
+    --bg-sub:      #f5f4f0;
+    --bg-soft:     #faf9f5;
+    --surface:     #ffffff;
+    /* 라인 */
+    --line:        #eae6dc;
+    --line-soft:   #f2efe8;
+    --line-strong: #dcd5c5;
+    /* 텍스트 */
+    --text-1:      #1f2a24;
+    --text-2:      #5a6660;
+    --text-3:      #8a9089;
+    --text-4:      #b0a89e;
+    /* 액센트 (Sage) */
+    --accent:        #5a9874;
+    --accent-hover:  #4a8664;
+    --accent-soft:   #e3efe7;
+    --accent-soft-2: #cfe5d6;
+    --accent-text:   #3d6f54;
+    /* 시맨틱 */
+    --warm:        #cf9b6c;  --warm-soft: #f5e6d3;  --warm-text: #8b5e30;
+    --danger:      #c4624c;  --danger-soft: #f5dfd7; --danger-text: #8b3825;
+    --info:        #5378a8;  --info-soft: #dfe7f1;  --info-text: #345a85;
+    --success-soft: #e3efe7; --success-text: #3d6f54;
+    /* 폰트 */
+    --font:      'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'DM Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    /* 라운드 / 그림자 */
+    --radius-sm: 7px; --radius: 9px; --radius-lg: 13px; --radius-pill: 999px;
+    --shadow-xs: 0 1px 2px rgba(40,44,40,0.04);
+    --shadow-md: 0 6px 16px -8px rgba(40,44,40,0.12), 0 1px 2px rgba(40,44,40,0.04);
+    --shadow-focus-ring: 0 0 0 3px rgba(90,152,116,0.16);
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --surface-1: #1a1a19;
-      --page: #0d0d0d;
-      --text-primary: #ffffff;
-      --text-secondary: #c3c2b7;
-      --text-muted: #898781;
-      --grid: #2c2c2a;
-      --baseline: #383835;
-      --border: rgba(255,255,255,0.10);
-      --series-1: #3987e5;
-      --series-2: #199e70;
-      --series-3: #c98500;
-      --series-4: #008300;
-      --seq-250: #184f95;
-      --seq-450: #3987e5;
-      --critical: #d03b3b;
-    }
-  }
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    background: var(--page);
-    color: var(--text-primary);
-    padding: 24px 16px 48px;
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text-1);
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
   }
-  .wrap { max-width: 1100px; margin: 0 auto; }
-  header h1 { font-size: 22px; font-weight: 700; }
-  header .meta { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+  a { color: var(--accent-text); text-decoration: none; }
 
-  .filters {
-    display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 16px;
-    align-items: center;
+  /* ----- 앱바 ----- */
+  .appbar {
+    background: var(--surface); height: 50px;
+    display: flex; align-items: center; padding: 0 26px;
+    border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 50;
   }
-  .filters label { font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
-  .filters select {
-    font: inherit; font-size: 13px; color: var(--text-primary);
-    background: var(--surface-1); border: 1px solid var(--border);
-    border-radius: 8px; padding: 6px 8px; min-width: 110px;
+  .appbar .brand { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; display: inline-flex; align-items: center; gap: 9px; }
+  .appbar .brand .mark {
+    width: 26px; height: 26px; border-radius: 8px; background: var(--accent); color: #fff;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700;
   }
-  .filters button {
-    font: inherit; font-size: 13px; color: var(--text-secondary);
-    background: none; border: 1px solid var(--border); border-radius: 8px;
-    padding: 6px 12px; cursor: pointer;
-  }
-  .filters button:hover { color: var(--text-primary); }
+  .appbar .brand .hl { color: var(--accent-text); }
+  .appbar .spacer { flex: 1; }
+  .appbar .meta { color: var(--text-3); font-size: 12px; font-family: var(--font-mono); }
 
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
-  .tile {
-    background: var(--surface-1); border: 1px solid var(--border);
-    border-radius: 12px; padding: 14px 16px;
-  }
-  .tile .k { font-size: 12px; color: var(--text-muted); }
-  .tile .v { font-size: 24px; font-weight: 700; margin-top: 4px; }
-  .tile .d { font-size: 12px; margin-top: 2px; color: var(--text-secondary); }
-  .tile .d.up { color: var(--series-1); }
-  .tile .d.down { color: var(--critical); }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 16px 24px 44px; }
 
+  /* ----- 페이지 헤드 + 필터 ----- */
+  .page-head {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    margin-bottom: 14px; gap: 16px; flex-wrap: wrap;
+    padding-bottom: 12px; border-bottom: 1px solid var(--line);
+  }
+  .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+  .page-subtitle { font-size: 13px; color: var(--text-3); margin-top: 4px; }
+  .toolbar { display: flex; gap: 9px; align-items: flex-end; flex-wrap: wrap; }
+  .fgroup { display: flex; flex-direction: column; gap: 4px; min-width: 120px; }
+  .fgroup.w { min-width: 130px; }
+  .label-uppercase {
+    font-size: 11px; font-weight: 600; color: var(--text-3);
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  select {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line-strong);
+    border-radius: var(--radius); font-size: 13px; color: var(--text-1);
+    background: var(--surface); font-family: var(--font); transition: all 0.13s ease;
+  }
+  select:focus { outline: none; border-color: var(--accent); box-shadow: var(--shadow-focus-ring); }
+  .btn {
+    padding: 8px 15px; border: 1px solid transparent; border-radius: var(--radius);
+    background: var(--accent); color: #fff; font-family: var(--font);
+    font-size: 13px; font-weight: 600; letter-spacing: -0.01em; cursor: pointer;
+    transition: all 0.13s ease; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { background: var(--accent-hover); box-shadow: 0 4px 14px -4px rgba(90,152,116,0.4); transform: translateY(-1px); }
+  .btn.sec { background: var(--surface); border-color: var(--line-strong); color: var(--text-1); }
+  .btn.sec:hover { background: var(--bg-soft); border-color: var(--text-3); box-shadow: var(--shadow-xs); transform: none; }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+
+  /* ----- 스탯 ----- */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 9px; margin-bottom: 12px; }
+  .stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 10px 13px; box-shadow: var(--shadow-xs); }
+  .stat .k { font-size: 11px; font-weight: 600; color: var(--text-3); letter-spacing: 0.04em; text-transform: uppercase; }
+  .stat .v { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin-top: 3px; line-height: 1.1; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .stat .v.sm { font-size: 17px; }
+  .stat .u { font-size: 12px; color: var(--text-3); margin-left: 3px; font-weight: 500; font-family: var(--font); }
+  .stat .b { margin-top: 5px; }
+
+  .badge {
+    display: inline-flex; align-items: center; padding: 3px 9px;
+    border-radius: var(--radius-pill); font-size: 11px; font-weight: 600;
+    white-space: nowrap; letter-spacing: -0.01em;
+  }
+  .badge.ok     { background: var(--success-soft); color: var(--success-text); }
+  .badge.danger { background: var(--danger-soft); color: var(--danger-text); }
+  .badge.gray   { background: var(--bg-sub); color: var(--text-2); }
+
+  /* ----- 카드 ----- */
   .card {
-    background: var(--surface-1); border: 1px solid var(--border);
-    border-radius: 12px; padding: 16px; margin-top: 16px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow-xs);
+    padding: 15px 17px; margin-top: 12px;
   }
-  .card h2 { font-size: 15px; font-weight: 600; }
-  .card .sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  @media (max-width: 760px) { .row2 { grid-template-columns: 1fr; } }
+  .card h2 { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
+  .card .sub { font-size: 13px; color: var(--text-3); margin-top: 2px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .row2 .card { margin-top: 12px; }
+  @media (max-width: 860px) { .row2 { grid-template-columns: 1fr; } }
 
-  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: var(--text-secondary); }
-  .legend .it { display: flex; align-items: center; gap: 5px; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px; font-size: 12px; color: var(--text-2); }
+  .legend .it { display: inline-flex; align-items: center; gap: 6px; }
   .legend .sw { width: 10px; height: 10px; border-radius: 3px; }
 
-  .chart-box { position: relative; margin-top: 8px; }
-  .chart-box svg { display: block; width: 100%; height: auto; }
+  /* ----- 차트 ----- */
+  .chart-box { position: relative; margin-top: 10px; }
+  .chart-box svg { display: block; width: 100%; }
+  #trend-svg { height: 235px; }
+  #year-svg { height: 205px; }
   .tooltip {
     position: absolute; pointer-events: none; z-index: 10; display: none;
-    background: var(--surface-1); border: 1px solid var(--border);
-    border-radius: 8px; padding: 8px 10px; font-size: 12px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.12); min-width: 120px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 9px 11px; font-size: 12px;
+    box-shadow: var(--shadow-md); min-width: 130px;
   }
-  .tooltip .tt-title { font-weight: 600; margin-bottom: 4px; }
-  .tooltip .tt-row { display: flex; align-items: center; gap: 6px; justify-content: space-between; color: var(--text-secondary); }
-  .tooltip .tt-row .lft { display: flex; align-items: center; gap: 5px; }
-  .tooltip .tt-row b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+  .tooltip .tt-title { font-weight: 700; margin-bottom: 5px; }
+  .tooltip .tt-row { display: flex; align-items: center; gap: 10px; justify-content: space-between; color: var(--text-2); line-height: 1.7; }
+  .tooltip .tt-row .lft { display: inline-flex; align-items: center; gap: 5px; }
+  .tooltip .tt-row b { color: var(--text-1); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
-  .hbars { margin-top: 12px; display: flex; flex-direction: column; gap: 7px; }
-  .hbar { display: grid; grid-template-columns: 90px 1fr 86px; align-items: center; gap: 8px; font-size: 12.5px; }
-  .hbar .name { color: var(--text-secondary); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .hbar .track { height: 18px; position: relative; }
-  .hbar .fill { height: 100%; border-radius: 0 4px 4px 0; background: var(--seq-450); min-width: 2px; }
-  .hbar .val { color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .hbar .val b { color: var(--text-primary); }
+  /* ----- 국가별 바 ----- */
+  .hbars { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
+  .hbar { display: grid; grid-template-columns: 90px 1fr minmax(110px, auto); align-items: center; gap: 10px; font-size: 13px; }
+  .hbar .name { color: var(--text-2); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hbar .track { height: 12px; background: var(--bg-sub); border-radius: var(--radius-pill); overflow: hidden; }
+  .hbar .fill { height: 100%; border-radius: var(--radius-pill); background: var(--accent); min-width: 3px; }
+  .hbar .fill.etc { background: var(--line-strong); }
+  .hbar .val { color: var(--text-3); font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 12px; text-align: right; }
+  .hbar .val b { color: var(--text-1); }
 
-  table.pivot { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
-  table.pivot th, table.pivot td { padding: 6px 10px; text-align: right; font-variant-numeric: tabular-nums; }
-  table.pivot th { color: var(--text-muted); font-weight: 500; border-bottom: 1px solid var(--baseline); }
-  table.pivot td:first-child, table.pivot th:first-child { text-align: left; color: var(--text-secondary); }
-  table.pivot tr:not(:last-child) td { border-bottom: 1px solid var(--grid); }
+  /* ----- 피벗 테이블 ----- */
+  .tbl-scroll { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--line); margin-top: 10px; }
+  table.dt { width: 100%; border-collapse: collapse; background: var(--surface); font-size: 13px; }
+  table.dt th {
+    padding: 7px 11px; background: var(--bg-sub); border-bottom: 1px solid var(--line);
+    font-size: 11px; font-weight: 600; color: var(--text-3);
+    letter-spacing: 0.02em; text-transform: uppercase; text-align: right; white-space: nowrap;
+  }
+  table.dt th.l, table.dt td.l { text-align: left; font-family: var(--font); color: var(--text-2); }
+  table.dt td {
+    padding: 5px 11px; border-bottom: 1px solid var(--line-soft); text-align: right;
+    white-space: nowrap; font-variant-numeric: tabular-nums; font-family: var(--font-mono);
+  }
+  table.dt tbody tr:hover td { background: var(--bg-soft); }
+  table.dt tr:last-child td { border-bottom: none; }
 
-  .fta-rows { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
-  .fta-row { display: grid; grid-template-columns: 48px 1fr 210px; gap: 10px; align-items: center; font-size: 13px; }
-  .fta-row .yr { color: var(--text-secondary); font-weight: 600; }
-  .fta-row .track { height: 14px; background: var(--grid); border-radius: 4px; overflow: hidden; }
-  .fta-row .fill { height: 100%; background: var(--seq-450); border-radius: 4px 0 0 4px; }
-  .fta-row .fill.over { background: var(--critical); }
-  .fta-row .info { color: var(--text-secondary); font-variant-numeric: tabular-nums; font-size: 12.5px; text-align: right; }
-  .empty { color: var(--text-muted); font-size: 13px; padding: 30px 0; text-align: center; }
+  /* ----- FTA ----- */
+  .fta-rows { margin-top: 10px; display: flex; flex-direction: column; gap: 7px; }
+  .fta-row { display: grid; grid-template-columns: 52px 1fr 250px; gap: 10px; align-items: center; font-size: 13px; }
+  .fta-row .yr { color: var(--text-1); font-weight: 600; font-family: var(--font-mono); }
+  .fta-row .track { height: 12px; background: var(--bg-sub); border-radius: var(--radius-pill); overflow: hidden; }
+  .fta-row .fill { height: 100%; border-radius: var(--radius-pill); background: var(--accent); }
+  .fta-row .fill.over { background: var(--danger); }
+  .fta-row .info { color: var(--text-2); font-variant-numeric: tabular-nums; font-size: 12px; text-align: right; }
+  .empty { color: var(--text-3); font-size: 13px; padding: 30px 0; text-align: center; }
+  .notice { padding: 13px 16px; border-radius: var(--radius); font-size: 13px; background: var(--info-soft); color: var(--info-text); border: 1px solid #c7d5e8; }
 
-  .ai-box { display: flex; gap: 8px; margin-top: 12px; align-items: stretch; }
+  /* ----- AI ----- */
+  .ai-box { display: flex; gap: 10px; margin-top: 10px; align-items: stretch; }
   .ai-box textarea {
-    flex: 1; font: inherit; font-size: 13px; color: var(--text-primary);
-    background: var(--page); border: 1px solid var(--border); border-radius: 8px;
-    padding: 8px 10px; resize: vertical; min-height: 40px;
+    flex: 1; font-family: var(--font); font-size: 13px; color: var(--text-1);
+    background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius);
+    padding: 9px 12px; resize: vertical; min-height: 44px;
   }
-  .ai-box button {
-    font: inherit; font-size: 13px; font-weight: 600; color: #fff;
-    background: var(--seq-450); border: none; border-radius: 8px;
-    padding: 0 18px; cursor: pointer;
-  }
-  .ai-box button:disabled { opacity: 0.5; cursor: default; }
+  .ai-box textarea:focus { outline: none; border-color: var(--accent); box-shadow: var(--shadow-focus-ring); }
   .ai-answer {
-    margin-top: 12px; padding: 12px 14px; font-size: 13.5px; line-height: 1.65;
-    background: var(--page); border: 1px solid var(--border); border-radius: 8px;
-    color: var(--text-primary); white-space: pre-wrap;
+    margin-top: 12px; padding: 13px 16px; font-size: 13px; line-height: 1.7;
+    background: var(--bg-soft); border: 1px solid var(--line); border-radius: var(--radius);
+    white-space: pre-wrap;
   }
-  footer { color: var(--text-muted); font-size: 12px; margin-top: 24px; text-align: center; }
+  footer { color: var(--text-3); font-size: 12px; margin-top: 16px; text-align: center; }
+
+  @media print {
+    .appbar, .toolbar, .btn { display: none !important; }
+    body { background: #fff; }
+    .card, .stat, .tbl-scroll { box-shadow: none; border-color: #ccc; }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>수입축산물 검역통계</h1>
-    <div class="meta" id="meta">데이터 불러오는 중...</div>
-  </header>
+<div class="appbar">
+  <div class="brand"><span class="mark">검</span>수입축산물&nbsp;<span class="hl">검역통계</span></div>
+  <div class="spacer"></div>
+  <div class="meta" id="meta">데이터 불러오는 중...</div>
+</div>
 
-  <div class="filters">
-    <label>품명 <select id="f-prod"></select></label>
-    <label>구분 <select id="f-gubun"></select></label>
-    <label>부위 <select id="f-part"></select></label>
-    <label>국가 <select id="f-country"></select></label>
-    <button id="f-reset">초기화</button>
+<div class="wrap">
+  <div class="page-head">
+    <div>
+      <div class="page-title">수입축산물 검역통계</div>
+      <div class="page-subtitle">식약처 수입식품정보 · 매월 1일·15일 자동 수집</div>
+    </div>
+    <div class="toolbar">
+      <div class="fgroup w"><span class="label-uppercase">품명</span><select id="f-prod"></select></div>
+      <div class="fgroup"><span class="label-uppercase">구분</span><select id="f-gubun"></select></div>
+      <div class="fgroup"><span class="label-uppercase">부위</span><select id="f-part"></select></div>
+      <div class="fgroup"><span class="label-uppercase">국가</span><select id="f-country"></select></div>
+      <button class="btn sec" id="f-reset">초기화</button>
+    </div>
   </div>
 
-  <div class="tiles" id="tiles"></div>
+  <div class="stats" id="tiles"></div>
 
   <div class="card">
-    <h2>월별 검역량 추이</h2>
+    <h2>월별 검역량 추이 <span class="badge gray">톤</span></h2>
     <div class="sub" id="trend-sub"></div>
     <div class="legend" id="trend-legend"></div>
     <div class="chart-box" id="trend-box">
-      <svg id="trend-svg" viewBox="0 0 1040 320"></svg>
+      <svg id="trend-svg" viewBox="0 0 1040 320" preserveAspectRatio="none"></svg>
       <div class="tooltip" id="trend-tt"></div>
     </div>
   </div>
@@ -186,16 +263,16 @@
       <h2>연도별 합계</h2>
       <div class="sub" id="year-sub"></div>
       <div class="chart-box" id="year-box">
-        <svg id="year-svg" viewBox="0 0 500 300"></svg>
+        <svg id="year-svg" viewBox="0 0 500 300" preserveAspectRatio="none"></svg>
         <div class="tooltip" id="year-tt"></div>
       </div>
     </div>
   </div>
 
   <div class="card">
-    <h2>월별 상세 (톤)</h2>
+    <h2>월별 상세 <span class="badge gray">톤</span></h2>
     <div class="sub">위 추이 차트와 동일한 데이터의 표 보기</div>
-    <div style="overflow-x:auto"><table class="pivot" id="pivot"></table></div>
+    <div class="tbl-scroll"><table class="dt" id="pivot"></table></div>
   </div>
 
   <div class="card" id="fta-card" style="display:none">
@@ -209,7 +286,7 @@
     <div class="sub">현재 필터로 보고 있는 데이터 요약이 질문에 자동으로 첨부됩니다</div>
     <div class="ai-box">
       <textarea id="ai-q" rows="2" placeholder="예: 최근 호주산 물량 추세가 어때? 작년이랑 비교해줘"></textarea>
-      <button id="ai-send">질문</button>
+      <button class="btn" id="ai-send">질문</button>
     </div>
     <div id="ai-answer" class="ai-answer" style="display:none"></div>
   </div>
@@ -221,7 +298,9 @@
 // ---------------------------------------------------------------- 데이터 로드
 const S = { records: [], years: [], fta: null, updatedAt: null };
 const F = { prod: '소정육', gubun: '', part: '', country: '' };  // ''=전체
-const SERIES_COLORS = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)'];
+// Sage 시리즈: 최신 연도 = accent, 이후 info/warm/danger
+const SERIES_COLORS = ['var(--accent)', 'var(--info)', 'var(--warm)', 'var(--danger)'];
+const AREA_FILL = 'rgba(90,152,116,0.10)';
 
 const fmtInt = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 });
 const fmt1 = new Intl.NumberFormat('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -302,7 +381,7 @@ function renderAll() {
   renderFta();
   const last = latestYm(ym);
   document.getElementById('meta').textContent =
-    `${last ? `최신 데이터: ${Math.floor(last / 100)}년 ${last % 100}월` : ''} · 갱신: ${new Date(S.updatedAt).toLocaleDateString('ko-KR')} · 자료: 식약처 수입식품정보`;
+    `${last ? `${Math.floor(last / 100)}년 ${last % 100}월 기준` : ''} · 갱신 ${new Date(S.updatedAt).toLocaleDateString('ko-KR')}`;
 }
 
 function latestYm(ym) {
@@ -316,17 +395,17 @@ function pctDelta(cur, prev) {
   if (!prev) return null;
   return (cur - prev) / prev * 100;
 }
-function deltaHtml(pct, label) {
-  if (pct === null) return `<div class="d">${label}: -</div>`;
-  const cls = pct >= 0 ? 'up' : 'down';
+function badgeHtml(pct, label) {
+  if (pct === null) return `<div class="b"><span class="badge gray">${label} -</span></div>`;
+  const cls = pct >= 0 ? 'ok' : 'danger';
   const sign = pct >= 0 ? '▲' : '▼';
-  return `<div class="d ${cls}">${label}: ${sign} ${Math.abs(pct).toFixed(1)}%</div>`;
+  return `<div class="b"><span class="badge ${cls}">${label} ${sign} ${Math.abs(pct).toFixed(1)}%</span></div>`;
 }
 
 function renderTiles(ym, dataYears) {
   const box = document.getElementById('tiles');
   const last = latestYm(ym);
-  if (!last) { box.innerHTML = '<div class="empty">선택한 조건의 데이터가 없습니다</div>'; return; }
+  if (!last) { box.innerHTML = '<div class="notice">선택한 조건의 데이터가 없습니다 · 필터를 초기화해 보세요</div>'; return; }
   const y = Math.floor(last / 100), m = last % 100;
   const cur = ym.get(last) ?? 0;
   const mom = pctDelta(cur, ym.get(prevYm(last)));
@@ -337,10 +416,10 @@ function renderTiles(ym, dataYears) {
   const ytdDelta = pctDelta(ytd, ytdPrev);
 
   box.innerHTML = `
-    <div class="tile"><div class="k">${y}년 ${m}월 검역량</div><div class="v">${tons(cur)} t</div>${deltaHtml(mom, '전월 대비')}</div>
-    <div class="tile"><div class="k">전년 동월 (${y - 1}년 ${m}월)</div><div class="v">${ym.has(last - 100) ? tons(ym.get(last - 100)) + ' t' : '-'}</div>${deltaHtml(yoy, '전년 동월 대비')}</div>
-    <div class="tile"><div class="k">${y}년 누계 (1~${m}월)</div><div class="v">${tons(ytd)} t</div>${deltaHtml(ytdDelta, '전년 동기 대비')}</div>
-    <div class="tile"><div class="k">데이터 범위</div><div class="v" style="font-size:18px">${dataYears[0]} ~ ${dataYears[dataYears.length - 1]}년</div><div class="d">${fmtInt.format(filtered().length)}개 레코드</div></div>`;
+    <div class="stat"><div class="k">${y}년 ${m}월 검역량</div><div class="v">${tons(cur)}<span class="u">t</span></div>${badgeHtml(mom, '전월 대비')}</div>
+    <div class="stat"><div class="k">전년 동월 (${y - 1}년 ${m}월)</div><div class="v">${ym.has(last - 100) ? tons(ym.get(last - 100)) + '<span class="u">t</span>' : '-'}</div>${badgeHtml(yoy, '전년 동월')}</div>
+    <div class="stat"><div class="k">${y}년 누계 (1~${m}월)</div><div class="v">${tons(ytd)}<span class="u">t</span></div>${badgeHtml(ytdDelta, '전년 동기')}</div>
+    <div class="stat"><div class="k">데이터 범위</div><div class="v sm">${dataYears[0]}~${dataYears[dataYears.length - 1]}<span class="u">년</span></div><div class="b"><span class="badge gray">${fmtInt.format(filtered().length)}개 레코드</span></div></div>`;
 }
 
 // 눈금 계산
@@ -362,7 +441,7 @@ let trendState = null; // {years, pts, xOf, yOf}
 function renderTrend(ym, years) {
   const svg = document.getElementById('trend-svg');
   const legend = document.getElementById('trend-legend');
-  document.getElementById('trend-sub').textContent = years.length ? `${years[0]}~${years[years.length - 1]}년 월별 비교 (톤)` : '';
+  document.getElementById('trend-sub').textContent = years.length ? `${years[0]}~${years[years.length - 1]}년 월별 비교` : '';
   if (!years.length) { svg.innerHTML = ''; legend.innerHTML = ''; trendState = null; return; }
 
   const { W, H, L, R, T, B } = TREND;
@@ -377,17 +456,18 @@ function renderTrend(ym, years) {
   let g = '';
   for (const t of ticks) {
     const y = yOf(t * 1000);
-    g += `<line x1="${L}" y1="${y}" x2="${W - R}" y2="${y}" stroke="var(--grid)" stroke-width="1"/>`;
-    g += `<text x="${L - 8}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--text-muted)">${fmtInt.format(t)}</text>`;
+    g += `<line x1="${L}" y1="${y}" x2="${W - R}" y2="${y}" stroke="var(--line-soft)" stroke-width="1"/>`;
+    g += `<text x="${L - 8}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--text-3)" font-family="DM Mono, monospace">${fmtInt.format(t)}</text>`;
   }
-  g += `<line x1="${L}" y1="${T + ph}" x2="${W - R}" y2="${T + ph}" stroke="var(--baseline)" stroke-width="1"/>`;
+  g += `<line x1="${L}" y1="${T + ph}" x2="${W - R}" y2="${T + ph}" stroke="var(--line-strong)" stroke-width="1"/>`;
   for (let m = 1; m <= 12; m++) {
-    g += `<text x="${xOf(m)}" y="${H - 12}" text-anchor="middle" font-size="11" fill="var(--text-muted)">${m}월</text>`;
+    g += `<text x="${xOf(m)}" y="${H - 12}" text-anchor="middle" font-size="11" fill="var(--text-3)">${m}월</text>`;
   }
 
-  const pts = new Map(); // year → [{m,v,x,y}]
+  const pts = new Map(); // year → {arr, color}
   years.forEach((yr, i) => {
     const color = SERIES_COLORS[years.length - 1 - i]; // 최신 연도 = slot1
+    const isNewest = i === years.length - 1;
     const arr = [];
     for (let m = 1; m <= 12; m++) {
       const v = ym.get(yr * 100 + m);
@@ -396,14 +476,20 @@ function renderTrend(ym, years) {
     pts.set(yr, { arr, color });
     if (arr.length > 0) {
       const d = arr.map((p, j) => `${j ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join('');
-      g += `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>`;
+      if (isNewest) {
+        // 최신 연도만 은은한 영역 채움
+        g += `<path d="${d}L${arr[arr.length - 1].x.toFixed(1)},${T + ph} L${arr[0].x.toFixed(1)},${T + ph} Z" fill="${AREA_FILL}" stroke="none"/>`;
+      }
+      g += `<path d="${d}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>`;
+      for (const p of arr) g += `<circle cx="${p.x}" cy="${p.y}" r="2.2" fill="${color}"/>`;
       const lastP = arr[arr.length - 1];
-      g += `<circle cx="${lastP.x}" cy="${lastP.y}" r="3" fill="${color}"/>`;
-      g += `<text x="${lastP.x + 8}" y="${lastP.y + 4}" font-size="11.5" fill="var(--text-secondary)">${yr}</text>`;
+      g += `<circle cx="${lastP.x}" cy="${lastP.y}" r="3.2" fill="${color}"/>`;
+      g += `<text x="${lastP.x + 9}" y="${lastP.y + 4}" font-size="11" fill="var(--text-2)" font-family="DM Mono, monospace">${yr}</text>`;
+      if (isNewest) g += `<text x="${lastP.x + 9}" y="${lastP.y + 20}" font-size="11" font-weight="600" fill="var(--accent-text)" font-family="DM Mono, monospace">${tons(lastP.v)}</text>`;
     }
   });
 
-  g += `<line id="trend-cross" x1="0" y1="${T}" x2="0" y2="${T + ph}" stroke="var(--baseline)" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>`;
+  g += `<line id="trend-cross" x1="0" y1="${T}" x2="0" y2="${T + ph}" stroke="var(--line-strong)" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>`;
   g += `<g id="trend-dots"></g>`;
   svg.innerHTML = g;
 
@@ -434,7 +520,7 @@ function bindTrendHover() {
     [...trendState.years].reverse().forEach((yr, i) => {
       const p = trendState.pts.get(yr).arr.find(p => p.m === m);
       if (p) {
-        dotHtml += `<circle cx="${p.x}" cy="${p.y}" r="4.5" fill="${trendState.pts.get(yr).color}" stroke="var(--surface-1)" stroke-width="2"/>`;
+        dotHtml += `<circle cx="${p.x}" cy="${p.y}" r="4.5" fill="${trendState.pts.get(yr).color}" stroke="#fff" stroke-width="2"/>`;
         rows += `<div class="tt-row"><span class="lft"><span class="sw" style="width:8px;height:8px;border-radius:2px;display:inline-block;background:${trendState.pts.get(yr).color}"></span>${yr}년</span><b>${tons(p.v)} t</b></div>`;
       }
     });
@@ -458,13 +544,13 @@ function bindTrendHover() {
 function renderPivot(ym, years) {
   const tbl = document.getElementById('pivot');
   if (!years.length) { tbl.innerHTML = ''; return; }
-  let html = '<tr><th>월</th>' + years.map(y => `<th>${y}년</th>`).join('') + '</tr>';
+  let html = '<tr><th class="l">월</th>' + years.map(y => `<th>${y}년</th>`).join('') + '</tr>';
   for (let m = 1; m <= 12; m++) {
     const cells = years.map(y => {
       const v = ym.get(y * 100 + m);
       return `<td>${v !== undefined ? tons(v) : '-'}</td>`;
     });
-    html += `<tr><td>${m}월</td>${cells.join('')}</tr>`;
+    html += `<tr><td class="l">${m}월</td>${cells.join('')}</tr>`;
   }
   tbl.innerHTML = html;
 }
@@ -504,7 +590,7 @@ function renderCountry() {
   box.innerHTML = top.map(([name, v]) => `
     <div class="hbar" title="${name}: ${tons(v)} t (${(v / total * 100).toFixed(1)}%)">
       <div class="name">${name}</div>
-      <div class="track"><div class="fill" style="width:${Math.max(1, v / maxV * 100)}%; ${name === '기타' ? 'background:var(--baseline)' : ''}"></div></div>
+      <div class="track"><div class="fill${name === '기타' ? ' etc' : ''}" style="width:${Math.max(1, v / maxV * 100)}%"></div></div>
       <div class="val"><b>${tons(v)}</b> t · ${(v / total * 100).toFixed(1)}%</div>
     </div>`).join('');
 }
@@ -522,7 +608,8 @@ function renderYearly(ym, dataYears) {
   });
   const lastEntry = totals[totals.length - 1];
   const partial = lastEntry.months < 12;
-  document.getElementById('year-sub').textContent = partial ? `${lastEntry.y}년은 1~${lastEntry.months}월 누계` : '';
+  document.getElementById('year-sub').textContent =
+    `${dataYears[0]}~${dataYears[dataYears.length - 1]}년 합계` + (partial ? ` · ${lastEntry.y}년은 1~${lastEntry.months}월 누계` : '');
 
   const W = 500, H = 300, L = 56, R = 8, T = 14, B = 32;
   const pw = W - L - R, ph = H - T - B;
@@ -531,23 +618,26 @@ function renderYearly(ym, dataYears) {
   const yMax = ticks[ticks.length - 1] * 1000;
   const n = totals.length;
   const slot = pw / n;
-  const bw = Math.min(34, slot - 2); // 바 사이 최소 2px 간격
+  const bw = Math.min(34, slot - 4);
 
   let g = '';
   for (const t of ticks) {
     const y = T + ph - t * 1000 / yMax * ph;
-    g += `<line x1="${L}" y1="${y}" x2="${W - R}" y2="${y}" stroke="var(--grid)" stroke-width="1"/>`;
-    g += `<text x="${L - 6}" y="${y + 4}" text-anchor="end" font-size="10.5" fill="var(--text-muted)">${fmtInt.format(t)}</text>`;
+    g += `<line x1="${L}" y1="${y}" x2="${W - R}" y2="${y}" stroke="var(--line-soft)" stroke-width="1"/>`;
+    g += `<text x="${L - 6}" y="${y + 4}" text-anchor="end" font-size="10.5" fill="var(--text-3)" font-family="DM Mono, monospace">${fmtInt.format(t)}</text>`;
   }
   totals.forEach((t, i) => {
     const x = L + slot * i + (slot - bw) / 2;
     const h = Math.max(1, t.s / yMax * ph);
     const y = T + ph - h;
-    const fill = (partial && i === n - 1) ? 'var(--seq-250)' : 'var(--seq-450)';
+    const fill = (partial && i === n - 1) ? 'var(--accent-soft-2)' : 'var(--accent)';
     g += `<path d="M${x},${y + 4} q0,-4 4,-4 h${bw - 8} q4,0 4,4 v${h - 4} h${-bw} z" fill="${fill}" data-i="${i}"/>`;
-    if (i % 2 === 0 || n <= 8) g += `<text x="${x + bw / 2}" y="${H - 12}" text-anchor="middle" font-size="10.5" fill="var(--text-muted)">${String(t.y).slice(2)}</text>`;
+    if (i % 2 === 0 || n <= 8) {
+      g += `<text x="${x + bw / 2}" y="${H - 12}" text-anchor="middle" font-size="10.5" fill="var(--text-3)" font-family="DM Mono, monospace">${String(t.y).slice(2)}</text>`;
+      g += `<text x="${x + bw / 2}" y="${Math.max(11, y - 6)}" text-anchor="middle" font-size="10" fill="var(--text-2)" font-family="DM Mono, monospace">${tons(t.s)}</text>`;
+    }
   });
-  g += `<line x1="${L}" y1="${T + ph}" x2="${W - R}" y2="${T + ph}" stroke="var(--baseline)" stroke-width="1"/>`;
+  g += `<line x1="${L}" y1="${T + ph}" x2="${W - R}" y2="${T + ph}" stroke="var(--line-strong)" stroke-width="1"/>`;
   svg.innerHTML = g;
 
   svg.onmousemove = e => {
@@ -604,7 +694,7 @@ function buildAiContext() {
   }
 
   const byCountry = new Map();
-  let k = last;
+  let k = latestYm(ym);
   const window = new Set();
   for (let i = 0; i < 12; i++) { window.add(k); k = prevYm(k); }
   for (const r of filtered(true)) {
