@@ -248,7 +248,7 @@
     <div class="sub" id="trend-sub"></div>
     <div class="legend" id="trend-legend"></div>
     <div class="chart-box" id="trend-box">
-      <svg id="trend-svg" viewBox="0 0 1040 320" preserveAspectRatio="none"></svg>
+      <svg id="trend-svg"></svg>
       <div class="tooltip" id="trend-tt"></div>
     </div>
   </div>
@@ -263,7 +263,7 @@
       <h2>연도별 합계</h2>
       <div class="sub" id="year-sub"></div>
       <div class="chart-box" id="year-box">
-        <svg id="year-svg" viewBox="0 0 500 300" preserveAspectRatio="none"></svg>
+        <svg id="year-svg"></svg>
         <div class="tooltip" id="year-tt"></div>
       </div>
     </div>
@@ -435,8 +435,14 @@ function niceTicks(max, n = 4) {
 }
 
 // ---------------------------------------------------------------- 추이 라인차트
-const TREND = { W: 1040, H: 320, L: 64, R: 70, T: 16, B: 34 };
-let trendState = null; // {years, pts, xOf, yOf}
+let trendState = null; // {years, pts, xOf, yOf, W, L, R}
+
+// viewBox를 실제 표시 크기에 맞춰 설정 — 글자·점이 왜곡되지 않게 1:1 좌표계 유지
+function fitViewBox(svg, cssH) {
+  const W = Math.max(240, Math.round(svg.clientWidth || svg.parentElement.clientWidth || 900));
+  svg.setAttribute('viewBox', `0 0 ${W} ${cssH}`);
+  return W;
+}
 
 function renderTrend(ym, years) {
   const svg = document.getElementById('trend-svg');
@@ -444,7 +450,9 @@ function renderTrend(ym, years) {
   document.getElementById('trend-sub').textContent = years.length ? `${years[0]}~${years[years.length - 1]}년 월별 비교` : '';
   if (!years.length) { svg.innerHTML = ''; legend.innerHTML = ''; trendState = null; return; }
 
-  const { W, H, L, R, T, B } = TREND;
+  const H = 235; // CSS의 #trend-svg height와 동일해야 함
+  const W = fitViewBox(svg, H);
+  const L = W < 560 ? 46 : 64, R = W < 560 ? 44 : 70, T = 16, B = 30;
   const pw = W - L - R, ph = H - T - B;
   let maxV = 0;
   for (const y of years) for (let m = 1; m <= 12; m++) maxV = Math.max(maxV, ym.get(y * 100 + m) ?? 0);
@@ -496,7 +504,7 @@ function renderTrend(ym, years) {
   legend.innerHTML = [...years].reverse().map((yr, i) =>
     `<span class="it"><span class="sw" style="background:${SERIES_COLORS[i]}"></span>${yr}년</span>`).join('');
 
-  trendState = { years, pts, xOf, yOf };
+  trendState = { years, pts, xOf, yOf, W, L, R };
   bindTrendHover();
 }
 
@@ -507,9 +515,9 @@ function bindTrendHover() {
   svg.onmousemove = e => {
     if (!trendState) return;
     const rect = svg.getBoundingClientRect();
-    const sx = TREND.W / rect.width;
+    const sx = trendState.W / rect.width;
     const px = (e.clientX - rect.left) * sx;
-    const m = Math.max(1, Math.min(12, Math.round((px - TREND.L) / (TREND.W - TREND.L - TREND.R) * 11 + 1)));
+    const m = Math.max(1, Math.min(12, Math.round((px - trendState.L) / (trendState.W - trendState.L - trendState.R) * 11 + 1)));
     const x = trendState.xOf(m);
     const cross = svg.querySelector('#trend-cross');
     cross.setAttribute('x1', x); cross.setAttribute('x2', x);
@@ -611,7 +619,9 @@ function renderYearly(ym, dataYears) {
   document.getElementById('year-sub').textContent =
     `${dataYears[0]}~${dataYears[dataYears.length - 1]}년 합계` + (partial ? ` · ${lastEntry.y}년은 1~${lastEntry.months}월 누계` : '');
 
-  const W = 500, H = 300, L = 56, R = 8, T = 14, B = 32;
+  const H = 205; // CSS의 #year-svg height와 동일해야 함
+  const W = fitViewBox(svg, H);
+  const L = 56, R = 8, T = 14, B = 32;
   const pw = W - L - R, ph = H - T - B;
   const maxV = Math.max(...totals.map(t => t.s));
   const ticks = niceTicks(maxV / 1000);
@@ -721,7 +731,8 @@ function initAi() {
     ansEl.style.display = '';
     ansEl.textContent = '분석 중...';
     try {
-      const prompt = buildAiContext() + '\n\n[질문] ' + q;
+      // GAS는 GET 호출이라 URL 길이 한계가 있음 — 질문·요약을 안전 범위로 제한
+      const prompt = buildAiContext().slice(0, 1200) + '\n\n[질문] ' + q.slice(0, 500);
       const url = endpoint + '?action=ai&prompt=' + encodeURIComponent(prompt);
       const res = await fetch(url);
       const json = await res.json();
@@ -737,6 +748,26 @@ function initAi() {
   btn.onclick = ask;
   qEl.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(); } };
 }
+
+// 창 크기 변경 시 차트 재렌더 (viewBox가 표시 크기를 따라가므로)
+// 렌더 후 실제 폭과 어긋나 있으면(레이아웃 안정 전 측정) 한 번 더 렌더한다.
+let resizeTimer = null;
+function rerenderCharts() {
+  if (!S.records.length) return;
+  renderAll();
+  requestAnimationFrame(() => {
+    const svg = document.getElementById('trend-svg');
+    const vbW = Number((svg.getAttribute('viewBox') || '0 0 0 0').split(' ')[2]);
+    if (svg.clientWidth && Math.abs(svg.clientWidth - vbW) > 2) renderAll();
+  });
+}
+// 창 리사이즈 + 요소 크기 변화 둘 다 감시 (브라우저·환경별 차이 커버)
+function queueRerender() {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(rerenderCharts, 200);
+}
+window.addEventListener('resize', queueRerender);
+new ResizeObserver(queueRerender).observe(document.getElementById('trend-box'));
 
 load().catch(err => {
   document.getElementById('meta').textContent = '데이터 로드 실패: ' + err.message;

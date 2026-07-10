@@ -30,7 +30,10 @@ function parseArgs(argv) {
 function parseYm(s) {
   const m = /^(\d{4})-(\d{1,2})$/.exec(s);
   if (!m) throw new Error(`날짜 형식이 잘못됨 (YYYY-MM 필요): ${s}`);
-  return { year: Number(m[1]), month: Number(m[2]) };
+  const year = Number(m[1]), month = Number(m[2]);
+  if (month < 1 || month > 12) throw new Error(`월은 1~12 사이여야 함: ${s}`);
+  if (year < 2000 || year > 2100) throw new Error(`연도가 범위를 벗어남: ${s}`);
+  return { year, month };
 }
 
 // KST 기준 전월

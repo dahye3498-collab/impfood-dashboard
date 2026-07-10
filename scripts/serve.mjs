@@ -9,11 +9,15 @@ const PORT = Number(process.argv[2]) || 8123;
 const MIME = { '.html': 'text/html; charset=utf-8', '.json': 'application/json; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
 
 http.createServer((req, res) => {
-  const urlPath = decodeURIComponent(req.url.split('?')[0]);
-  let file = path.join(ROOT, urlPath === '/' ? 'index.html' : urlPath);
-  if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
-    res.writeHead(404); res.end('not found'); return;
+  try {
+    const urlPath = decodeURIComponent(req.url.split('?')[0]);
+    let file = path.join(ROOT, urlPath === '/' ? 'index.html' : urlPath);
+    if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+      res.writeHead(404); res.end('not found'); return;
+    }
+    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] ?? 'application/octet-stream' });
+    fs.createReadStream(file).pipe(res);
+  } catch (e) {
+    res.writeHead(400); res.end('bad request');
   }
-  res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] ?? 'application/octet-stream' });
-  fs.createReadStream(file).pipe(res);
 }).listen(PORT, () => console.log(`http://localhost:${PORT}`));

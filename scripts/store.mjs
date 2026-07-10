@@ -50,7 +50,13 @@ export function mergeIntoYear(year, newRecords, { replaceMonths = [], replacePro
     );
   }
   const keys = new Set(existing.map(recordKey));
-  const added = newRecords.filter(r => !keys.has(recordKey(r)));
+  // 기존 데이터와의 중복 + 신규 배치 안에서의 중복을 모두 걸러낸다
+  const added = newRecords.filter(r => {
+    const k = recordKey(r);
+    if (keys.has(k)) return false;
+    keys.add(k);
+    return true;
+  });
   if (added.length > 0 || replaceMonths.length > 0) {
     saveYear(year, existing.concat(added));
   }
