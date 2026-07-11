@@ -304,6 +304,47 @@
   .share-row .seg span { font-size: 10.5px; font-weight: 600; color: rgba(255,255,255,0.95); font-family: var(--font-mono); }
   .share-row .seg.etc span { color: var(--text-2); }
 
+  /* ----- 월 상세 드릴다운 모달 ----- */
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(31,42,36,0.35); backdrop-filter: blur(2px);
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 7vh 16px 16px; overflow-y: auto;
+  }
+  .modal {
+    background: var(--surface); border-radius: var(--radius-lg);
+    box-shadow: 0 20px 60px -12px rgba(31,42,36,0.35);
+    width: 100%; max-width: 680px; padding: 18px 20px;
+  }
+  .modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .modal-title { font-size: 16px; font-weight: 700; }
+  .modal-x {
+    font: inherit; font-size: 20px; line-height: 1; color: var(--text-3);
+    background: none; border: none; cursor: pointer; padding: 2px 6px; border-radius: 6px;
+  }
+  .modal-x:hover { color: var(--text-1); background: var(--bg-sub); }
+  .modal-body { margin-top: 12px; }
+  .mm-kpis { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 14px; }
+  .mm-kpis .k { font-size: 11px; color: var(--text-3); }
+  .mm-kpis .v { font-size: 16px; font-weight: 700; font-family: var(--font-mono); }
+  .mm-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 560px) { .mm-cols { grid-template-columns: 1fr; } }
+  .mm-cols h3 { font-size: 12.5px; font-weight: 700; color: var(--text-2); margin-bottom: 8px; }
+  .mrow { display: grid; grid-template-columns: 74px 1fr auto; gap: 8px; align-items: center; font-size: 12px; padding: 2.5px 0; }
+  .mrow .nm { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+  .mrow .trk { height: 12px; background: var(--bg-sub); border-radius: 4px; overflow: hidden; }
+  .mrow .trk i { display: block; height: 100%; background: var(--accent); border-radius: 4px 0 0 4px; }
+  .mrow .vv { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text-1); }
+  .mrow .vv .yy { font-size: 11px; margin-left: 5px; }
+  .mrow .vv .yy.up { color: var(--success-text); }
+  .mrow .vv .yy.down { color: var(--danger-text); }
+  .mrow .vv .yy.na { color: var(--text-4); }
+  table.dt td.mclick, table.heat td.mclick { cursor: pointer; }
+  table.dt td.mclick:hover { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 4px; }
+  table.heat td.mclick:hover { outline: 2px solid var(--text-1); outline-offset: -2px; }
+  table.dt th.ytoggle { cursor: pointer; }
+  table.dt th.ytoggle:hover { color: var(--accent-text); }
+
   /* ----- 인쇄 (월간 리포트 모드) ----- */
   .print-header { display: none; }
   @media print {
@@ -443,6 +484,16 @@
   </div>
 
   <footer>자료: 식약처 수입식품정보(impfood.mfds.go.kr) · 매월 1일·15일 자동 수집</footer>
+</div>
+
+<div class="modal-backdrop" id="month-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-head">
+      <div><div class="modal-title" id="mm-title"></div><div class="sub" id="mm-sub"></div></div>
+      <button class="modal-x" id="mm-close" title="닫기">×</button>
+    </div>
+    <div class="modal-body" id="mm-body"></div>
+  </div>
 </div>
 
 <script>
@@ -1077,12 +1128,14 @@ function renderPivot(ym, years) {
   const tbl = document.getElementById('pivot');
   if (!years.length) { tbl.innerHTML = ''; return; }
   const last = latestYm(ym);
-  let html = '<tr><th class="l">월</th>' + years.map(y => `<th>${y}년</th>`).join('') + '</tr>';
+  let html = '<tr><th class="l">월</th>' + years.map(y =>
+    `<th class="ytoggle" data-yy="${y}" title="클릭하면 이 연도를 비교에서 제외">${y}년</th>`).join('') + '</tr>';
   for (let m = 1; m <= 12; m++) {
     const isCur = last !== null && m === last % 100;
     const cells = years.map(y => {
       const v = ym.get(y * 100 + m);
-      return `<td${v === undefined ? ' class="na"' : ''}>${v !== undefined ? tons(v) : '–'}</td>`;
+      return v === undefined ? '<td class="na">–</td>'
+        : `<td class="mclick" data-y="${y}" data-m="${m}" title="클릭하면 ${y}년 ${m}월 상세">${tons(v)}</td>`;
     });
     html += `<tr${isCur ? ' class="cur"' : ''}><td class="l">${m}월</td>${cells.join('')}</tr>`;
   }
@@ -1095,6 +1148,14 @@ function renderPivot(ym, years) {
   html += `<tr class="sum"><td class="l">합계</td>${sums.map(({ s, months }) =>
     `<td>${months ? tons(s) : '–'}${months && months < 12 ? `<span class="part">1~${months}월</span>` : ''}</td>`).join('')}</tr>`;
   tbl.innerHTML = html;
+
+  // 드릴다운: 월 셀 클릭 → 상세, 연도 헤더 클릭 → 비교에서 제외
+  tbl.querySelectorAll('td.mclick').forEach(td => td.onclick = () => showMonthDetail(+td.dataset.y, +td.dataset.m));
+  tbl.querySelectorAll('th.ytoggle').forEach(th => th.onclick = () => {
+    if (years.length <= 1) return;
+    V.years = years.filter(x => x !== +th.dataset.yy);
+    renderAll();
+  });
 }
 
 // ---------------------------------------------------------------- 국가별 바
@@ -1235,19 +1296,21 @@ function renderHeatmap(ym, dataYears) {
     return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
   };
 
-  const cell = v => {
+  const cell = (v, y, m) => {
     if (v === undefined || v === null) return '<td class="na">–</td>';
     const t = maxV ? v / maxV : 0;
-    return `<td style="background:${heatColor(t)};color:${t > 0.55 ? '#fff' : 'var(--text-1)'}" title="${tons(v)}t">${fmtInt.format(Math.round(v / 1000))}</td>`;
+    const click = y ? ` class="mclick" data-y="${y}" data-m="${m}"` : '';
+    return `<td${click} style="background:${heatColor(t)};color:${t > 0.55 ? '#fff' : 'var(--text-1)'}" title="${tons(v)}t${y ? ` · 클릭하면 ${y}년 ${m}월 상세` : ''}">${fmtInt.format(Math.round(v / 1000))}</td>`;
   };
 
   let html = '<tr><th class="l">연도</th>' + Array.from({ length: 12 }, (_, i) => `<th>${i + 1}월</th>`).join('') + '</tr>';
   for (const y of years) {
-    html += `<tr><td class="l">${y}</td>` + Array.from({ length: 12 }, (_, i) => cell(ym.get(y * 100 + i + 1))).join('') + '</tr>';
+    html += `<tr><td class="l">${y}</td>` + Array.from({ length: 12 }, (_, i) => cell(ym.get(y * 100 + i + 1), y, i + 1)).join('') + '</tr>';
   }
   html += `<tr class="avg"><td class="l" title="최근 5개 완결 연도(${baseYears.join(', ')}) 평균">평년</td>` +
     Array.from({ length: 12 }, (_, i) => cell(avgOf(i + 1))).join('') + '</tr>';
   tbl.innerHTML = html;
+  tbl.querySelectorAll('td.mclick').forEach(td => td.onclick = () => showMonthDetail(+td.dataset.y, +td.dataset.m));
 
   // 평년 대비 시그널
   if (last) {
@@ -1353,6 +1416,63 @@ function ftaPaceHtml(yearStr, d) {
   const when = `${exhaust.getMonth() + 1}월 ${exhaust.getDate()}일`;
   return `<div class="fta-pace${warn ? ' warn' : ''}">↳ 현재 페이스(연도 경과 대비 ${pace.toFixed(1)}배)면 ${inYear ? `<b>${when}경 소진</b>${dLeft > 0 ? ` — 약 ${dLeft}일 남음` : ''}` : '<b>연내 소진되지 않을</b> 것으로 추정'} <span class="basis">(${d.as_of} 사용률 기준 선형 추정)</span></div>`;
 }
+
+// ---------------------------------------------------------------- 월 상세 드릴다운
+function showMonthDetail(y, m) {
+  const inMonth = r => r[6] === y && r[5] === m;
+  const recs = filtered().filter(inMonth);
+  if (!recs.length) return;
+  const prevRecs = filtered().filter(r => r[6] === y - 1 && r[5] === m);
+
+  const total = recs.reduce((s, r) => s + r[4], 0);
+  const ym = sumByYearMonth(filtered());
+  const mom = pctDelta(total, ym.get(prevYm(y * 100 + m)));
+  const yoy = pctDelta(total, ym.get((y - 1) * 100 + m));
+  const fmtD = p => p === null ? '<span class="yy na">-</span>' :
+    `<span class="yy ${p >= 0 ? 'up' : 'down'}">${p >= 0 ? '▲' : '▼'}${Math.abs(p).toFixed(1)}%</span>`;
+
+  // 차원별 분해: 이번 달 + 전년 동월
+  const breakdown = idx => {
+    const cur = new Map(), prev = new Map();
+    for (const r of recs) cur.set(r[idx], (cur.get(r[idx]) ?? 0) + r[4]);
+    for (const r of prevRecs) prev.set(r[idx], (prev.get(r[idx]) ?? 0) + r[4]);
+    return [...cur.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
+      .map(([name, v]) => ({ name, v, yoy: pctDelta(v, prev.get(name)) }));
+  };
+  const listHtml = items => {
+    const maxV = items[0]?.v ?? 1;
+    return items.map(it => `
+      <div class="mrow">
+        <div class="nm" title="${it.name}">${it.name}</div>
+        <div class="trk"><i style="width:${Math.max(2, it.v / maxV * 100)}%"></i></div>
+        <div class="vv">${tons(it.v)}t${fmtD(it.yoy)}</div>
+      </div>`).join('');
+  };
+
+  const countries = breakdown(3);
+  const parts = breakdown(2);
+  const showParts = parts.length > 1; // 부위가 하나뿐이면(필터됨 or 전체 합산 품명) 생략
+
+  document.getElementById('mm-title').textContent = `${y}년 ${m}월 상세`;
+  document.getElementById('mm-sub').textContent =
+    [F.prod, F.gubun, F.part, F.country].filter(Boolean).join(' · ') + ' · 증감은 전년 동월 대비';
+  document.getElementById('mm-body').innerHTML = `
+    <div class="mm-kpis">
+      <div><div class="k">검역량</div><div class="v">${tons(total)} t</div></div>
+      <div><div class="k">전월 대비</div><div class="v">${mom === null ? '-' : (mom >= 0 ? '+' : '−') + Math.abs(mom).toFixed(1) + '%'}</div></div>
+      <div><div class="k">전년 동월 대비</div><div class="v">${yoy === null ? '-' : (yoy >= 0 ? '+' : '−') + Math.abs(yoy).toFixed(1) + '%'}</div></div>
+    </div>
+    <div class="mm-cols">
+      <div><h3>국가별</h3>${listHtml(countries)}</div>
+      ${showParts ? `<div><h3>부위별</h3>${listHtml(parts)}</div>` : ''}
+    </div>`;
+  document.getElementById('month-modal').style.display = '';
+}
+
+function closeMonthModal() { document.getElementById('month-modal').style.display = 'none'; }
+document.getElementById('mm-close').onclick = closeMonthModal;
+document.getElementById('month-modal').onclick = e => { if (e.target.id === 'month-modal') closeMonthModal(); };
+window.addEventListener('keydown', e => { if (e.key === 'Escape') closeMonthModal(); });
 
 // ---------------------------------------------------------------- 인쇄 (월간 리포트 모드)
 function updatePrintHeader() {
