@@ -242,6 +242,9 @@
   .fta-row .yr { color: var(--text-1); font-weight: 600; font-family: var(--font-mono); }
   .fta-row .track { height: 12px; background: var(--bg-sub); border-radius: var(--radius-pill); overflow: hidden; }
   .fta-row .track.na { background: none; border: 1px dashed var(--line-strong); }
+  .fta-pace { font-size: 12.5px; color: var(--text-2); margin: -4px 0 2px 54px; }
+  .fta-pace.warn { color: var(--danger-text); }
+  .fta-pace .basis { color: var(--text-4); font-size: 11px; }
   .fta-row .fill { height: 100%; border-radius: var(--radius-pill); background: var(--accent); }
   .fta-row .fill.over { background: var(--danger); }
   .fta-row .info { color: var(--text-2); font-variant-numeric: tabular-nums; font-size: 12px; text-align: right; }
@@ -411,8 +414,14 @@
   </div>
 
   <div class="card">
-    <h2>국가 점유율 추이</h2>
-    <div class="sub" id="share-sub"></div>
+    <div class="card-head">
+      <div><h2>구성 비중 추이</h2><div class="sub" id="share-sub"></div></div>
+      <div class="seg-ctl" id="share-dim">
+        <button data-d="country" class="on">국가</button>
+        <button data-d="part">부위</button>
+        <button data-d="gubun">구분</button>
+      </div>
+    </div>
     <div class="legend" id="share-legend"></div>
     <div class="share-rows" id="share-rows"></div>
   </div>
@@ -1254,20 +1263,38 @@ function renderHeatmap(ym, dataYears) {
 // ---------------------------------------------------------------- 국가 점유율 추이
 const SHARE_COLORS = ['var(--accent)', 'var(--info)', 'var(--warm)', 'var(--danger)', '#8a7fc9'];
 
+let shareDim = 'country'; // 구성 비중 차원: country(국가) | part(부위) | gubun(구분)
+const SHARE_DIMS = {
+  country: { idx: 3, label: '국가', unitLabel: '상위 1개국', hhiLabel: '공급 집중도' },
+  part: { idx: 2, label: '부위', unitLabel: '상위 1개 부위', hhiLabel: '집중도' },
+  gubun: { idx: 1, label: '구분', unitLabel: '최다 구분', hhiLabel: '집중도' },
+};
+
 function renderShare() {
   const rowsEl = document.getElementById('share-rows');
   const legend = document.getElementById('share-legend');
   const sub = document.getElementById('share-sub');
+  const dim = SHARE_DIMS[shareDim];
+  document.querySelectorAll('#share-dim button').forEach(b => b.classList.toggle('on', b.dataset.d === shareDim));
+
+  // 현재 필터 적용하되, 보고 있는 차원의 필터만 무시 (그 차원의 전체 구성을 봐야 하므로)
+  const recs = S.records.filter(r =>
+    r[0] === F.prod &&
+    (shareDim === 'gubun' || !F.gubun || r[1] === F.gubun) &&
+    (shareDim === 'part' || !F.part || r[2] === F.part) &&
+    (shareDim === 'country' || !F.country || r[3] === F.country)
+  );
   const byYear = new Map();
-  for (const r of filtered(true)) {
+  for (const r of recs) {
     if (!byYear.has(r[6])) byYear.set(r[6], new Map());
     const m = byYear.get(r[6]);
-    m.set(r[3], (m.get(r[3]) ?? 0) + r[4]);
+    const key = r[dim.idx];
+    m.set(key, (m.get(key) ?? 0) + r[4]);
   }
   const years = [...byYear.keys()].sort((a, b) => a - b).slice(-6);
   if (!years.length) { rowsEl.innerHTML = '<div class="empty">데이터 없음</div>'; legend.innerHTML = ''; sub.textContent = ''; return; }
 
-  // 색은 국가(entity)에 고정 — 표시 기간 전체 합계 상위 5개국 기준
+  // 색은 항목(entity)에 고정 — 표시 기간 전체 합계 상위 5개 기준
   const totals = new Map();
   for (const y of years) for (const [c, v] of byYear.get(y)) totals.set(c, (totals.get(c) ?? 0) + v);
   const top = [...totals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(e => e[0]);
@@ -1285,17 +1312,46 @@ function renderShare() {
       }).join('') + '</div></div>';
   }).join('');
 
+  const hasEtc = years.some(y => {
+    const m = byYear.get(y);
+    const tot = [...m.values()].reduce((a, b) => a + b, 0);
+    return tot - top.reduce((s, c) => s + (m.get(c) ?? 0), 0) > 0;
+  });
   legend.innerHTML = top.map((c, i) =>
     `<span class="it"><span class="sw" style="background:${SHARE_COLORS[i]}"></span>${c}</span>`).join('') +
-    '<span class="it"><span class="sw" style="background:var(--line-strong)"></span>기타</span>';
+    (hasEtc ? '<span class="it"><span class="sw" style="background:var(--line-strong)"></span>기타</span>' : '');
 
-  // 집중도: 최신 연도 상위 1개국 점유율 + HHI
+  // 집중도: 최신 연도 상위 1개 항목 비중 + HHI
   const lastY = years[years.length - 1];
   const m = byYear.get(lastY);
   const tot = [...m.values()].reduce((a, b) => a + b, 0);
   const hhi = Math.round([...m.values()].reduce((s, v) => s + Math.pow(v / tot * 100, 2), 0));
   const top1 = [...m.entries()].sort((a, b) => b[1] - a[1])[0];
-  sub.innerHTML = `${lastY}년 상위 1개국 <b>${top1[0]} ${(top1[1] / tot * 100).toFixed(1)}%</b> · 공급 집중도 HHI <b>${fmtInt.format(hhi)}</b> <span title="0에 가까울수록 분산, 10,000이면 한 나라 독점. 2,500 이상이면 고집중.">ⓘ</span>`;
+  sub.innerHTML = `${lastY}년 ${dim.unitLabel} <b>${top1[0]} ${(top1[1] / tot * 100).toFixed(1)}%</b> · ${dim.hhiLabel} HHI <b>${fmtInt.format(hhi)}</b> <span title="0에 가까울수록 분산, 10,000이면 하나가 독점. 2,500 이상이면 고집중.">ⓘ</span>`;
+}
+
+document.querySelectorAll('#share-dim button').forEach(b => b.onclick = () => {
+  shareDim = b.dataset.d;
+  renderShare();
+});
+
+// FTA 소진 페이스 예측 — 올해 연도이고 사용률·기준일이 있으면 선형 페이스로 소진 시점 추정
+function ftaPaceHtml(yearStr, d) {
+  const y = Number(yearStr);
+  const now = new Date();
+  if (y !== now.getFullYear() || d.usage_pct === null || d.usage_pct >= 100 || !d.as_of) return '';
+  const asOf = new Date(d.as_of + 'T00:00:00');
+  if (isNaN(asOf)) return '';
+  const yearStart = new Date(y, 0, 1);
+  const elapsedDays = Math.max(1, (asOf - yearStart) / 86400000);
+  const pace = d.usage_pct / (elapsedDays / 365 * 100); // 1보다 크면 연도 경과보다 빠른 소진
+  const exhaustDays = elapsedDays / d.usage_pct * 100;  // 연초부터 소진까지 걸릴 일수 (선형 가정)
+  const exhaust = new Date(yearStart.getTime() + exhaustDays * 86400000);
+  const inYear = exhaust.getFullYear() === y;
+  const dLeft = Math.round((exhaust - now) / 86400000);
+  const warn = inYear && dLeft <= 60;
+  const when = `${exhaust.getMonth() + 1}월 ${exhaust.getDate()}일`;
+  return `<div class="fta-pace${warn ? ' warn' : ''}">↳ 현재 페이스(연도 경과 대비 ${pace.toFixed(1)}배)면 ${inYear ? `<b>${when}경 소진</b>${dLeft > 0 ? ` — 약 ${dLeft}일 남음` : ''}` : '<b>연내 소진되지 않을</b> 것으로 추정'} <span class="basis">(${d.as_of} 사용률 기준 선형 추정)</span></div>`;
 }
 
 // ---------------------------------------------------------------- 인쇄 (월간 리포트 모드)
@@ -1323,7 +1379,7 @@ function renderFta() {
       <div class="yr">${y}</div>
       <div class="track${pct === null ? ' na' : ''}">${pct !== null ? `<div class="fill${over ? ' over' : ''}" style="width:${width}%"></div>` : ''}</div>
       <div class="info">${pct !== null ? `${pct}%${over ? ' ⚠ 초과' : ''} 사용` : '사용률 미입력'} · 기준 ${fmtInt.format(d.quota_mt)} MT${d.remaining_mt ? ` · 잔여 ${fmtInt.format(d.remaining_mt)}` : ''}</div>
-    </div>`;
+    </div>${ftaPaceHtml(y, d)}`;
   }).join('');
 }
 
