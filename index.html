@@ -190,6 +190,8 @@
   table.dt tr.cur td { background: var(--accent-soft); font-weight: 600; }
   table.dt tr.cur td.l::after { content: " ●"; color: var(--accent); font-size: 8px; vertical-align: 2px; }
   table.dt td.na { color: var(--text-4); }
+  table.dt tr.sum td { border-top: 2px solid var(--line-strong); font-weight: 700; background: var(--bg-soft); }
+  table.dt tr.sum td .part { font-weight: 400; font-size: 10.5px; color: var(--text-3); margin-left: 5px; font-family: var(--font); }
 
   /* ----- FTA ----- */
   .fta-rows { margin-top: 10px; display: flex; flex-direction: column; gap: 7px; }
@@ -506,7 +508,7 @@ function renderTrend(ym, years) {
   });
 
   // 라인 끝 연도 라벨 — x가 비슷한 라벨끼리는 세로 간격 13px 이상 확보 (겹침 방지)
-  const HALO = 'stroke="var(--surface)" stroke-width="3" paint-order="stroke"';
+  const HALO = 'stroke="var(--surface)" stroke-width="4" paint-order="stroke"';
   const groups = new Map();
   for (const lb of endLabels) {
     const gx = Math.round(lb.x / 30);
@@ -526,7 +528,8 @@ function renderTrend(ym, years) {
   }
   for (const lb of endLabels) {
     g += `<text x="${lb.x + 9}" y="${lb.y + 4}" font-size="11" fill="var(--text-2)" font-family="DM Mono, monospace" ${HALO}>${lb.yr}</text>`;
-    if (lb.isNewest) g += `<text x="${lb.x + 9}" y="${lb.y + 20}" font-size="11" font-weight="600" fill="var(--accent-text)" font-family="DM Mono, monospace" ${HALO}>${tons(lb.v)}</text>`;
+    // 최신값은 점 위쪽(다른 라인이 지나지 않는 빈 공간)에 표시
+    if (lb.isNewest) g += `<text x="${lb.x}" y="${Math.max(11, lb.y - 12)}" text-anchor="middle" font-size="11" font-weight="600" fill="var(--accent-text)" font-family="DM Mono, monospace" ${HALO}>${tons(lb.v)}</text>`;
   }
 
   g += `<line id="trend-cross" x1="0" y1="${T}" x2="0" y2="${T + ph}" stroke="var(--line-strong)" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>`;
@@ -594,6 +597,14 @@ function renderPivot(ym, years) {
     });
     html += `<tr${isCur ? ' class="cur"' : ''}><td class="l">${m}월</td>${cells.join('')}</tr>`;
   }
+  // 합계 행 — 부분 연도는 수록된 달까지의 누계
+  const sums = years.map(y => {
+    let s = 0, months = 0;
+    for (let m = 1; m <= 12; m++) { const v = ym.get(y * 100 + m); if (v !== undefined) { s += v; months++; } }
+    return { s, months };
+  });
+  html += `<tr class="sum"><td class="l">합계</td>${sums.map(({ s, months }) =>
+    `<td>${months ? tons(s) : '–'}${months && months < 12 ? `<span class="part">1~${months}월</span>` : ''}</td>`).join('')}</tr>`;
   tbl.innerHTML = html;
 }
 
