@@ -261,10 +261,39 @@
   }
   footer { color: var(--text-3); font-size: 12px; margin-top: 16px; text-align: center; }
 
+  /* ----- 계절성 히트맵 ----- */
+  table.heat td, table.heat th { padding: 5px 4px; font-size: 10.5px; text-align: center; }
+  table.heat td { font-family: var(--font-mono); font-variant-numeric: tabular-nums; border-bottom: 2px solid var(--surface); }
+  table.heat th.l, table.heat td.l { text-align: right; padding-right: 8px; font-family: var(--font-mono); color: var(--text-2); }
+  table.heat tr.avg td { border-top: 2px solid var(--line-strong); }
+  table.heat td.na { color: var(--text-4); background: var(--bg-sub); }
+
+  /* ----- 국가 점유율 ----- */
+  .share-rows { display: flex; flex-direction: column; gap: 7px; margin-top: 12px; }
+  .share-row { display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: center; }
+  .share-row .yr { font-size: 12px; font-weight: 600; color: var(--text-2); font-family: var(--font-mono); text-align: right; }
+  .share-row .bar { display: flex; gap: 2px; height: 22px; }
+  .share-row .seg {
+    border-radius: 4px; min-width: 3px; position: relative;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  .share-row .seg span { font-size: 10.5px; font-weight: 600; color: rgba(255,255,255,0.95); font-family: var(--font-mono); }
+  .share-row .seg.etc span { color: var(--text-2); }
+
+  /* ----- 인쇄 (월간 리포트 모드) ----- */
+  .print-header { display: none; }
   @media print {
-    .appbar, .toolbar, .btn { display: none !important; }
-    body { background: #fff; }
-    .card, .stat, .tbl-scroll { box-shadow: none; border-color: #ccc; }
+    .appbar, .toolbar, .presets, .btn, .card-actions, #ai-card, .tooltip { display: none !important; }
+    body { background: #fff; padding: 0; font-size: 12px; }
+    .wrap { max-width: none; padding: 0; }
+    .page-head { display: none; }
+    .print-header { display: block; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 2px solid #333; }
+    .print-header .t { font-size: 19px; font-weight: 700; }
+    .print-header .s { font-size: 11.5px; color: #555; margin-top: 3px; }
+    .card, .stat { box-shadow: none; border-color: #ccc; break-inside: avoid; }
+    .card { margin-top: 10px; padding: 12px 14px; }
+    .row2 { grid-template-columns: 1fr 1fr; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
 </style>
 </head>
@@ -288,8 +317,11 @@
       <div class="fgroup"><span class="label-uppercase">국가</span><select id="f-country"></select></div>
       <button class="btn sec" id="f-reset">초기화</button>
       <button class="btn sec" id="f-share" title="현재 화면 그대로 열리는 링크를 복사합니다">링크 복사</button>
+      <button class="btn sec" id="f-print" title="A4 보고서 형태로 인쇄·PDF 저장">인쇄</button>
     </div>
   </div>
+
+  <div class="print-header" id="print-header"></div>
 
   <div class="presets" id="presets"></div>
 
@@ -341,6 +373,20 @@
       </div>
     </div>
     <div class="tbl-scroll"><table class="dt" id="pivot"></table></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div><h2>계절성 히트맵 <span class="badge gray">톤</span></h2><div class="sub" id="season-sub"></div></div>
+    </div>
+    <div class="tbl-scroll"><table class="dt heat" id="heatmap"></table></div>
+  </div>
+
+  <div class="card">
+    <h2>국가 점유율 추이</h2>
+    <div class="sub" id="share-sub"></div>
+    <div class="legend" id="share-legend"></div>
+    <div class="share-rows" id="share-rows"></div>
   </div>
 
   <div class="card" id="fta-card" style="display:none">
@@ -448,9 +494,12 @@ function renderAll() {
   renderPivot(ym, trendYears);
   renderCountry();
   renderYearly(ym, dataYears);
+  renderHeatmap(ym, dataYears);
+  renderShare();
   renderFta();
   renderPresets();
   saveState();
+  updatePrintHeader();
   const last = latestYm(ym);
   document.getElementById('meta').textContent =
     `${last ? `${Math.floor(last / 100)}년 ${last % 100}월 기준` : ''} · 갱신 ${new Date(S.updatedAt).toLocaleDateString('ko-KR')}`;
@@ -656,6 +705,9 @@ document.getElementById('f-share').onclick = async function () {
   await copyText(location.href);
   flashDone(this, '복사됨 ✓');
 };
+
+document.getElementById('f-print').onclick = () => window.print();
+window.addEventListener('beforeprint', updatePrintHeader);
 
 function latestYm(ym) {
   let max = 0;
@@ -976,6 +1028,113 @@ function renderYearly(ym, dataYears) {
     tt.style.top = (e.clientY - rect.top - 40) + 'px';
   };
   svg.onmouseleave = () => { tt.style.display = 'none'; };
+}
+
+// ---------------------------------------------------------------- 계절성 히트맵
+// 세이지 단일 색상 램프 (밝음=적음 → 어두움=많음)
+function heatColor(t) {
+  const a = [240, 246, 242], b = [31, 74, 53];
+  const k = Math.pow(t, 0.8); // 저값 구간을 살짝 벌려 분포가 읽히게
+  const c = a.map((av, i) => Math.round(av + (b[i] - av) * k));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+
+function renderHeatmap(ym, dataYears) {
+  const tbl = document.getElementById('heatmap');
+  const sub = document.getElementById('season-sub');
+  const years = dataYears.slice(-10);
+  if (!years.length) { tbl.innerHTML = ''; sub.textContent = ''; return; }
+
+  let maxV = 0;
+  for (const y of years) for (let m = 1; m <= 12; m++) maxV = Math.max(maxV, ym.get(y * 100 + m) ?? 0);
+
+  const last = latestYm(ym);
+  const curYear = last ? Math.floor(last / 100) : null;
+  const baseYears = years.filter(y => y !== curYear).slice(-5); // 평년 = 최근 5개 완결 연도
+  const avgOf = m => {
+    const vals = baseYears.map(y => ym.get(y * 100 + m)).filter(v => v !== undefined);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  };
+
+  const cell = v => {
+    if (v === undefined || v === null) return '<td class="na">–</td>';
+    const t = maxV ? v / maxV : 0;
+    return `<td style="background:${heatColor(t)};color:${t > 0.55 ? '#fff' : 'var(--text-1)'}" title="${tons(v)}t">${fmtInt.format(Math.round(v / 1000))}</td>`;
+  };
+
+  let html = '<tr><th class="l">연도</th>' + Array.from({ length: 12 }, (_, i) => `<th>${i + 1}월</th>`).join('') + '</tr>';
+  for (const y of years) {
+    html += `<tr><td class="l">${y}</td>` + Array.from({ length: 12 }, (_, i) => cell(ym.get(y * 100 + i + 1))).join('') + '</tr>';
+  }
+  html += `<tr class="avg"><td class="l" title="최근 5개 완결 연도(${baseYears.join(', ')}) 평균">평년</td>` +
+    Array.from({ length: 12 }, (_, i) => cell(avgOf(i + 1))).join('') + '</tr>';
+  tbl.innerHTML = html;
+
+  // 평년 대비 시그널
+  if (last) {
+    const m = last % 100, cur = ym.get(last) ?? 0, avg = avgOf(m);
+    if (avg) {
+      const dev = (cur - avg) / avg * 100;
+      const tone = Math.abs(dev) >= 15 ? (dev > 0 ? ' <span class="badge ok">평년 대비 공급 많음</span>' : ' <span class="badge danger">평년 대비 공급 적음</span>') : '';
+      sub.innerHTML = `${curYear}년 ${m}월은 평년 ${m}월(${tons(avg)}t) 대비 <b>${dev >= 0 ? '+' : '−'}${Math.abs(dev).toFixed(1)}%</b>${tone}`;
+    } else sub.textContent = '';
+  }
+}
+
+// ---------------------------------------------------------------- 국가 점유율 추이
+const SHARE_COLORS = ['var(--accent)', 'var(--info)', 'var(--warm)', 'var(--danger)', '#8a7fc9'];
+
+function renderShare() {
+  const rowsEl = document.getElementById('share-rows');
+  const legend = document.getElementById('share-legend');
+  const sub = document.getElementById('share-sub');
+  const byYear = new Map();
+  for (const r of filtered(true)) {
+    if (!byYear.has(r[6])) byYear.set(r[6], new Map());
+    const m = byYear.get(r[6]);
+    m.set(r[3], (m.get(r[3]) ?? 0) + r[4]);
+  }
+  const years = [...byYear.keys()].sort((a, b) => a - b).slice(-6);
+  if (!years.length) { rowsEl.innerHTML = '<div class="empty">데이터 없음</div>'; legend.innerHTML = ''; sub.textContent = ''; return; }
+
+  // 색은 국가(entity)에 고정 — 표시 기간 전체 합계 상위 5개국 기준
+  const totals = new Map();
+  for (const y of years) for (const [c, v] of byYear.get(y)) totals.set(c, (totals.get(c) ?? 0) + v);
+  const top = [...totals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(e => e[0]);
+  const colorOf = c => { const i = top.indexOf(c); return i >= 0 ? SHARE_COLORS[i] : 'var(--line-strong)'; };
+
+  rowsEl.innerHTML = [...years].reverse().map(y => {
+    const m = byYear.get(y);
+    const tot = [...m.values()].reduce((a, b) => a + b, 0);
+    const segs = top.map(c => ({ c, v: m.get(c) ?? 0 }));
+    segs.push({ c: '기타', v: tot - segs.reduce((s, x) => s + x.v, 0) });
+    return `<div class="share-row"><div class="yr">${y}</div><div class="bar">` +
+      segs.filter(s => s.v > 0).map(s => {
+        const pct = s.v / tot * 100;
+        return `<div class="seg${s.c === '기타' ? ' etc' : ''}" style="width:${pct}%;background:${colorOf(s.c)}" title="${y}년 ${s.c} ${pct.toFixed(1)}% · ${tons(s.v)}t">${pct >= 9 ? `<span>${pct.toFixed(0)}%</span>` : ''}</div>`;
+      }).join('') + '</div></div>';
+  }).join('');
+
+  legend.innerHTML = top.map((c, i) =>
+    `<span class="it"><span class="sw" style="background:${SHARE_COLORS[i]}"></span>${c}</span>`).join('') +
+    '<span class="it"><span class="sw" style="background:var(--line-strong)"></span>기타</span>';
+
+  // 집중도: 최신 연도 상위 1개국 점유율 + HHI
+  const lastY = years[years.length - 1];
+  const m = byYear.get(lastY);
+  const tot = [...m.values()].reduce((a, b) => a + b, 0);
+  const hhi = Math.round([...m.values()].reduce((s, v) => s + Math.pow(v / tot * 100, 2), 0));
+  const top1 = [...m.entries()].sort((a, b) => b[1] - a[1])[0];
+  sub.innerHTML = `${lastY}년 상위 1개국 <b>${top1[0]} ${(top1[1] / tot * 100).toFixed(1)}%</b> · 공급 집중도 HHI <b>${fmtInt.format(hhi)}</b> <span title="0에 가까울수록 분산, 10,000이면 한 나라 독점. 2,500 이상이면 고집중.">ⓘ</span>`;
+}
+
+// ---------------------------------------------------------------- 인쇄 (월간 리포트 모드)
+function updatePrintHeader() {
+  const last = latestYm(sumByYearMonth(filtered()));
+  const cond = [F.prod, F.gubun, F.part, F.country].filter(Boolean).join(' · ');
+  document.getElementById('print-header').innerHTML =
+    `<div class="t">수입축산물 검역통계 월간 리포트${last ? ` — ${Math.floor(last / 100)}년 ${last % 100}월` : ''}</div>
+     <div class="s">조건: ${cond} · 자료: 식약처 수입식품정보 · 출력일 ${new Date().toLocaleDateString('ko-KR')}</div>`;
 }
 
 // ---------------------------------------------------------------- FTA
