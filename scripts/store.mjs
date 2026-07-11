@@ -44,6 +44,17 @@ export function saveYear(year, records) {
 export function mergeIntoYear(year, newRecords, { replaceMonths = [], replaceProducts = null } = {}) {
   let existing = loadYear(year);
   if (replaceMonths.length > 0) {
+    // 안전장치: 교체하려는 새 데이터가 기존 대비 30% 미만이면 API 이상 응답일
+    // 가능성이 높으므로 중단한다 (정상적인 정정으로 조합이 이렇게 급감하지는 않음)
+    const wouldRemove = existing.filter(r =>
+      replaceMonths.includes(r[5]) && (!replaceProducts || replaceProducts.includes(r[0]))
+    ).length;
+    if (wouldRemove >= 20 && newRecords.length < wouldRemove * 0.3) {
+      throw new Error(
+        `교체 중단: ${year}년 ${replaceMonths.join(',')}월 기존 ${wouldRemove}행을 새 데이터 ${newRecords.length}행으로 ` +
+        `바꾸려 함 (70% 이상 감소 — API 이상 응답 의심). 정말 맞다면 해당 월 데이터를 수동 확인 후 진행하세요.`
+      );
+    }
     existing = existing.filter(r =>
       !replaceMonths.includes(r[5]) ||
       (replaceProducts && !replaceProducts.includes(r[0]))

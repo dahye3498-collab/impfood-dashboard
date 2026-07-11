@@ -757,6 +757,8 @@ function exportRows(kind) {
   const recs = filtered(true);
   const ym = sumByYearMonth(recs);
   const last = latestYm(ym);
+  const header = [['국가', '검역량(t)', '비중(%)']];
+  if (!last) return header; // 데이터 없음 — 헤더만
   const win = new Set(); let k = last;
   for (let i = 0; i < 12; i++) { win.add(k); k = prevYm(k); }
   const byC = new Map(); let total = 0;
@@ -783,9 +785,10 @@ async function copyText(text) {
 }
 
 function flashDone(btn, label) {
-  const t = btn.textContent;
+  if (!btn.dataset.orig) btn.dataset.orig = btn.textContent; // 연타해도 원래 라벨 보존
   btn.textContent = label; btn.classList.add('done');
-  setTimeout(() => { btn.textContent = t; btn.classList.remove('done'); }, 1600);
+  clearTimeout(btn._flashTimer);
+  btn._flashTimer = setTimeout(() => { btn.textContent = btn.dataset.orig; btn.classList.remove('done'); }, 1600);
 }
 
 document.querySelectorAll('[data-export]').forEach(btn => btn.onclick = async () => {
@@ -914,16 +917,18 @@ function drawLineChart(cols, series, opts = {}) {
   const drawDots = n <= 30;
   for (const s of series) {
     s.pts = s.vals.map((v, i) => v == null ? null : { x: xOf(i), y: yOf(v), v });
-    let d = '', started = false, firstP = null, lastP = null;
+    let d = '', started = false, firstP = null, lastP = null, segments = 0;
     for (const p of s.pts) {
       if (!p) { started = false; continue; }
+      if (!started) segments++;
       d += `${started ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`;
       started = true;
       if (!firstP) firstP = p;
       lastP = p;
     }
     if (!d) continue;
-    if (s.fill && firstP && lastP) {
+    // 중간에 데이터 구멍이 있으면(선이 끊기면) 채움 생략 — 구멍을 가로질러 칠해지는 것 방지
+    if (s.fill && segments === 1 && firstP && lastP) {
       g += `<path d="${d}L${lastP.x.toFixed(1)},${T + ph} L${firstP.x.toFixed(1)},${T + ph} Z" fill="${AREA_FILL}" stroke="none"/>`;
     }
     g += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>`;
