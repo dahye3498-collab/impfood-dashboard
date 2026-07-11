@@ -116,6 +116,11 @@
   /* ----- 카드 헤더 액션 ----- */
   .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
   .card-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  @media (max-width: 640px) {
+    /* 좁은 화면: 제목이 토글에 밀려 세로로 꺾이지 않게 위아래 배치 */
+    .card-head { flex-direction: column; align-items: stretch; gap: 8px; }
+    .card-head .seg-ctl, .card-head .card-actions { align-self: flex-start; }
+  }
 
   /* ----- 즐겨찾기 프리셋 ----- */
   .presets { display: flex; gap: 7px; flex-wrap: wrap; margin: 0 0 12px; }
@@ -646,7 +651,9 @@ function renderPresets() {
   const curName = presetName(F);
   let html = ps.map((p, i) =>
     `<span class="chip${presetName(p) === curName ? ' active' : ''}" data-i="${i}" title="클릭하면 이 조건으로 전환">${presetName(p)}<span class="x" data-x="${i}" title="삭제">×</span></span>`).join('');
-  if (!ps.some(p => presetName(p) === curName) && ps.length < 6) {
+  // 저장 칩은 세부 필터를 걸었거나 이미 프리셋이 있을 때만 — 기본 화면에서 혼자 떠 있지 않게
+  const meaningful = F.gubun || F.part || F.country || ps.length > 0;
+  if (meaningful && !ps.some(p => presetName(p) === curName) && ps.length < 6) {
     html += `<span class="chip add" id="preset-add" title="현재 필터 조합을 즐겨찾기로 저장">＋ 현재 조건 저장</span>`;
   }
   box.innerHTML = html;
