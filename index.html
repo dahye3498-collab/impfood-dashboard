@@ -212,6 +212,8 @@
   .hbar .val { color: var(--text-3); font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 12px; text-align: right; }
   .hbar .val b { color: var(--text-1); }
   .hbar .val .pct { display: inline-block; min-width: 46px; text-align: right; color: var(--text-3); }
+  .hbar.clickable { cursor: pointer; border-radius: var(--radius-sm); }
+  .hbar.clickable:hover { background: var(--bg-soft); }
 
   /* ----- 피벗 테이블 ----- */
   .tbl-scroll { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--line); margin-top: 10px; }
@@ -260,6 +262,25 @@
     white-space: pre-wrap;
   }
   footer { color: var(--text-3); font-size: 12px; margin-top: 16px; text-align: center; }
+
+  /* ----- 추이 차트 모드 토글 · 연도 칩 ----- */
+  .seg-ctl { display: inline-flex; background: var(--bg-sub); border-radius: var(--radius); padding: 3px; gap: 2px; flex-shrink: 0; }
+  .seg-ctl button {
+    font: inherit; font-size: 12px; font-weight: 600; color: var(--text-2);
+    background: none; border: none; border-radius: 7px; padding: 5px 12px; cursor: pointer;
+    transition: all 0.13s ease; white-space: nowrap;
+  }
+  .seg-ctl button:hover { color: var(--text-1); }
+  .seg-ctl button.on { background: var(--surface); color: var(--accent-text); box-shadow: var(--shadow-xs); }
+  .ychips { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 10px; }
+  .ychips:empty { display: none; }
+  .ychip {
+    font: inherit; font-size: 11.5px; font-weight: 600; font-family: var(--font-mono);
+    color: var(--text-3); background: none; border: 1px solid var(--line);
+    border-radius: var(--radius-pill); padding: 3px 10px; cursor: pointer; transition: all 0.13s ease;
+  }
+  .ychip:hover { border-color: var(--accent); color: var(--accent-text); }
+  .ychip.on { background: var(--accent-soft); border-color: var(--accent-soft-2); color: var(--accent-text); }
 
   /* ----- 계절성 히트맵 ----- */
   table.heat td, table.heat th { padding: 5px 4px; font-size: 10.5px; text-align: center; }
@@ -334,8 +355,15 @@
   <div class="stats" id="tiles"></div>
 
   <div class="card">
-    <h2>월별 검역량 추이 <span class="badge gray">톤</span></h2>
-    <div class="sub" id="trend-sub"></div>
+    <div class="card-head">
+      <div><h2>검역량 추이 <span class="badge gray">톤</span></h2><div class="sub" id="trend-sub"></div></div>
+      <div class="seg-ctl" id="trend-mode">
+        <button data-m="year" class="on">연도 비교</button>
+        <button data-m="country">국가 비교</button>
+        <button data-m="mat">장기 추세</button>
+      </div>
+    </div>
+    <div class="ychips" id="year-chips"></div>
     <div class="legend" id="trend-legend"></div>
     <div class="chart-box" id="trend-box">
       <svg id="trend-svg"></svg>
@@ -487,10 +515,10 @@ function renderAll() {
   const recs = filtered();
   const ym = sumByYearMonth(recs);
   const dataYears = uniq(recs.map(r => r[6])).sort((a, b) => a - b);
-  const trendYears = dataYears.slice(-4);          // 최근 4개 연도
+  const trendYears = selectedYears(dataYears);     // 사용자가 고른 비교 연도 (기본: 최근 4개)
   renderBriefing(ym);
   renderTiles(ym, dataYears);
-  renderTrend(ym, trendYears);
+  renderTrend(ym, dataYears);
   renderPivot(ym, trendYears);
   renderCountry();
   renderYearly(ym, dataYears);
@@ -511,9 +539,11 @@ const FKEYS = [['prod', 'p'], ['gubun', 'g'], ['part', 'b'], ['country', 'c']];
 function saveState() {
   const q = new URLSearchParams();
   for (const [k, s] of FKEYS) if (F[k]) q.set(s, F[k]);
+  if (V.mode !== 'year') q.set('vm', V.mode);
+  if (V.years && V.years.length) q.set('yrs', V.years.join('.'));
   const h = q.toString();
   history.replaceState(null, '', h ? '#' + h : location.pathname + location.search);
-  try { localStorage.setItem('impfood.filter', JSON.stringify(F)); } catch (e) {}
+  try { localStorage.setItem('impfood.filter', JSON.stringify({ ...F, _vm: V.mode, _yrs: V.years })); } catch (e) {}
 }
 
 function restoreState() {
@@ -521,8 +551,14 @@ function restoreState() {
   if (location.hash.length > 1) {
     const q = new URLSearchParams(location.hash.slice(1));
     src = {}; for (const [k, s] of FKEYS) src[k] = q.get(s) || '';
+    src._vm = q.get('vm') || 'year';
+    src._yrs = q.get('yrs') ? q.get('yrs').split('.').map(Number).filter(Number.isFinite) : null;
   } else {
     try { src = JSON.parse(localStorage.getItem('impfood.filter')); } catch (e) {}
+  }
+  if (src) {
+    if (['year', 'country', 'mat'].includes(src._vm)) V.mode = src._vm;
+    if (Array.isArray(src._yrs) && src._yrs.length) V.years = src._yrs.slice(0, 4);
   }
   applyFilterState(src);
 }
@@ -645,7 +681,7 @@ function exportRows(kind) {
   if (kind === 'pivot') {
     const recs = filtered();
     const ym = sumByYearMonth(recs);
-    const years = uniq(recs.map(r => r[6])).sort((a, b) => a - b).slice(-4);
+    const years = selectedYears(uniq(recs.map(r => r[6])).sort((a, b) => a - b));
     const rows = [['월', ...years.map(y => y + '년')]];
     for (let m = 1; m <= 12; m++) rows.push([m + '월', ...years.map(y => { const v = ym.get(y * 100 + m); return v !== undefined ? Math.round(v / 1000) : ''; })]);
     rows.push(['합계', ...years.map(y => { let s = 0, n = 0; for (let m = 1; m <= 12; m++) { const v = ym.get(y * 100 + m); if (v !== undefined) { s += v; n++; } } return n ? Math.round(s / 1000) : ''; })]);
@@ -760,7 +796,8 @@ function niceTicks(max, n = 4) {
 }
 
 // ---------------------------------------------------------------- 추이 라인차트
-let trendState = null; // {years, pts, xOf, yOf, W, L, R}
+let trendState = null; // 공통 스캐폴드 상태: {W,L,R,T,B,n,xOf,cols,series}
+const V = { mode: 'year', years: null }; // 추이 차트 보기 상태 (years: null=최근 4개년 자동, 선택 순서 유지)
 
 // viewBox를 실제 표시 크기에 맞춰 설정 — 글자·점이 왜곡되지 않게 1:1 좌표계 유지
 function fitViewBox(svg, cssH) {
@@ -769,21 +806,28 @@ function fitViewBox(svg, cssH) {
   return W;
 }
 
-function renderTrend(ym, years) {
-  const svg = document.getElementById('trend-svg');
-  const legend = document.getElementById('trend-legend');
-  document.getElementById('trend-sub').textContent = years.length ? `${years[0]}~${years[years.length - 1]}년 월별 비교` : '';
-  if (!years.length) { svg.innerHTML = ''; legend.innerHTML = ''; trendState = null; return; }
+// 선택된 비교 연도 (최대 4개, 표시용은 오름차순)
+function selectedYears(dataYears) {
+  let ys = (V.years || []).filter(y => dataYears.includes(y));
+  if (!ys.length) ys = dataYears.slice(-4);
+  return [...ys].sort((a, b) => a - b).slice(-4);
+}
 
+// ---- 공통 라인차트 스캐폴드 ----
+// cols: [{label, tip}], series: [{name, color, vals:[v|null], fill?, primary?}]
+function drawLineChart(cols, series, opts = {}) {
+  const svg = document.getElementById('trend-svg');
   const H = 235; // CSS의 #trend-svg height와 동일해야 함
   const W = fitViewBox(svg, H);
   const L = W < 560 ? 46 : 64, R = W < 560 ? 44 : 70, T = 16, B = 30;
   const pw = W - L - R, ph = H - T - B;
+  const n = cols.length;
   let maxV = 0;
-  for (const y of years) for (let m = 1; m <= 12; m++) maxV = Math.max(maxV, ym.get(y * 100 + m) ?? 0);
+  for (const s of series) for (const v of s.vals) if (v != null && v > maxV) maxV = v;
+  if (!n || maxV === 0) { svg.innerHTML = ''; trendState = null; return; }
   const ticks = niceTicks(maxV / 1000);
   const yMax = ticks[ticks.length - 1] * 1000;
-  const xOf = m => L + (m - 1) / 11 * pw;
+  const xOf = i => L + (n === 1 ? pw / 2 : i / (n - 1) * pw);
   const yOf = v => T + ph - v / yMax * ph;
 
   let g = '';
@@ -793,38 +837,37 @@ function renderTrend(ym, years) {
     g += `<text x="${L - 8}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--text-3)" font-family="DM Mono, monospace">${fmtInt.format(t)}</text>`;
   }
   g += `<line x1="${L}" y1="${T + ph}" x2="${W - R}" y2="${T + ph}" stroke="var(--line-strong)" stroke-width="1"/>`;
-  // 좁은 화면에서는 홀수 달만 표기 (라벨 겹침 방지)
-  const mStep = W < 560 ? 2 : 1;
-  for (let m = 1; m <= 12; m += mStep) {
-    g += `<text x="${xOf(m)}" y="${H - 12}" text-anchor="middle" font-size="11" fill="var(--text-3)">${m}월</text>`;
+  // x축 라벨: label이 빈 문자열이면 건너뜀, 밀도는 화면 폭에 맞춰 자동 조절
+  const step = opts.xLabelStep ?? Math.max(1, Math.ceil(n / (W < 560 ? 6 : 12)));
+  for (let i = 0; i < n; i += step) {
+    if (cols[i].label) g += `<text x="${xOf(i)}" y="${H - 12}" text-anchor="middle" font-size="11" fill="var(--text-3)">${cols[i].label}</text>`;
   }
 
-  const pts = new Map(); // year → {arr, color}
   const endLabels = [];
-  years.forEach((yr, i) => {
-    const color = SERIES_COLORS[years.length - 1 - i]; // 최신 연도 = slot1
-    const isNewest = i === years.length - 1;
-    const arr = [];
-    for (let m = 1; m <= 12; m++) {
-      const v = ym.get(yr * 100 + m);
-      if (v !== undefined) arr.push({ m, v, x: xOf(m), y: yOf(v) });
+  const drawDots = n <= 30;
+  for (const s of series) {
+    s.pts = s.vals.map((v, i) => v == null ? null : { x: xOf(i), y: yOf(v), v });
+    let d = '', started = false, firstP = null, lastP = null;
+    for (const p of s.pts) {
+      if (!p) { started = false; continue; }
+      d += `${started ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`;
+      started = true;
+      if (!firstP) firstP = p;
+      lastP = p;
     }
-    pts.set(yr, { arr, color });
-    if (arr.length > 0) {
-      const d = arr.map((p, j) => `${j ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join('');
-      if (isNewest) {
-        // 최신 연도만 은은한 영역 채움
-        g += `<path d="${d}L${arr[arr.length - 1].x.toFixed(1)},${T + ph} L${arr[0].x.toFixed(1)},${T + ph} Z" fill="${AREA_FILL}" stroke="none"/>`;
-      }
-      g += `<path d="${d}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>`;
-      for (const p of arr) g += `<circle cx="${p.x}" cy="${p.y}" r="2.2" fill="${color}"/>`;
-      const lastP = arr[arr.length - 1];
-      g += `<circle cx="${lastP.x}" cy="${lastP.y}" r="3.2" fill="${color}"/>`;
-      endLabels.push({ x: lastP.x, y: lastP.y, yr, isNewest, v: lastP.v });
+    if (!d) continue;
+    if (s.fill && firstP && lastP) {
+      g += `<path d="${d}L${lastP.x.toFixed(1)},${T + ph} L${firstP.x.toFixed(1)},${T + ph} Z" fill="${AREA_FILL}" stroke="none"/>`;
     }
-  });
+    g += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    if (drawDots) for (const p of s.pts) if (p) g += `<circle cx="${p.x}" cy="${p.y}" r="2.2" fill="${s.color}"/>`;
+    if (lastP) {
+      g += `<circle cx="${lastP.x}" cy="${lastP.y}" r="3.2" fill="${s.color}"/>`;
+      endLabels.push({ x: lastP.x, y: lastP.y, name: s.name, primary: !!s.primary, v: lastP.v });
+    }
+  }
 
-  // 라인 끝 연도 라벨 — x가 비슷한 라벨끼리는 세로 간격 13px 이상 확보 (겹침 방지)
+  // 라인 끝 라벨 — x가 비슷한 라벨끼리는 세로 간격 13px 이상 확보 (겹침 방지)
   const HALO = 'stroke="var(--surface)" stroke-width="4" paint-order="stroke"';
   const groups = new Map();
   for (const lb of endLabels) {
@@ -844,21 +887,140 @@ function renderTrend(ym, years) {
     }
   }
   for (const lb of endLabels) {
-    g += `<text x="${lb.x + 9}" y="${lb.y + 4}" font-size="11" fill="var(--text-2)" font-family="DM Mono, monospace" ${HALO}>${lb.yr}</text>`;
-    // 최신값은 점 위쪽(다른 라인이 지나지 않는 빈 공간)에 표시
-    if (lb.isNewest) g += `<text x="${lb.x}" y="${Math.max(11, lb.y - 12)}" text-anchor="middle" font-size="11" font-weight="600" fill="var(--accent-text)" font-family="DM Mono, monospace" ${HALO}>${tons(lb.v)}</text>`;
+    if (opts.endNames !== false) g += `<text x="${lb.x + 9}" y="${lb.y + 4}" font-size="11" fill="var(--text-2)" font-family="DM Mono, monospace" ${HALO}>${lb.name}</text>`;
+    // 대표 시리즈의 최신값은 점 위쪽(빈 공간)에 표시
+    if (lb.primary) g += `<text x="${lb.x}" y="${Math.max(11, lb.y - 12)}" text-anchor="middle" font-size="11" font-weight="600" fill="var(--accent-text)" font-family="DM Mono, monospace" ${HALO}>${tons(lb.v)}</text>`;
   }
 
   g += `<line id="trend-cross" x1="0" y1="${T}" x2="0" y2="${T + ph}" stroke="var(--line-strong)" stroke-width="1" stroke-dasharray="3,3" visibility="hidden"/>`;
   g += `<g id="trend-dots"></g>`;
   svg.innerHTML = g;
 
-  legend.innerHTML = [...years].reverse().map((yr, i) =>
-    `<span class="it"><span class="sw" style="background:${SERIES_COLORS[i]}"></span>${yr}년</span>`).join('');
-
-  trendState = { years, pts, xOf, yOf, W, L, R };
+  trendState = { W, L, R, T, B, n, xOf, cols, series };
   bindTrendHover();
 }
+
+// ---- 모드별 렌더러 ----
+function renderTrend(ym, dataYears) {
+  updateTrendControls(dataYears);
+  const legend = document.getElementById('trend-legend');
+  if (V.mode === 'country') return renderTrendCountry(legend);
+  if (V.mode === 'mat') return renderTrendMat(legend);
+  renderTrendYears(ym, dataYears, legend);
+}
+
+function renderTrendYears(ym, dataYears, legend) {
+  const years = selectedYears(dataYears);
+  document.getElementById('trend-sub').textContent =
+    years.length ? `${years[0]}~${years[years.length - 1]}년 월별 비교 · 아래 연도 칩으로 비교 대상 선택 (최대 4개)` : '';
+  if (!years.length) { document.getElementById('trend-svg').innerHTML = ''; legend.innerHTML = ''; trendState = null; return; }
+
+  const cols = Array.from({ length: 12 }, (_, i) => ({ label: `${i + 1}월`, tip: `${i + 1}월` }));
+  const series = years.map((yr, i) => ({
+    name: String(yr),
+    color: SERIES_COLORS[years.length - 1 - i], // 최신 연도 = slot1
+    vals: cols.map((_, m) => ym.get(yr * 100 + m + 1) ?? null),
+    fill: i === years.length - 1,
+    primary: i === years.length - 1,
+  }));
+  legend.innerHTML = [...years].reverse().map((yr, i) =>
+    `<span class="it"><span class="sw" style="background:${SERIES_COLORS[i]}"></span>${yr}년</span>`).join('');
+  drawLineChart(cols, series);
+}
+
+function renderTrendCountry(legend) {
+  const recs = filtered(true); // 국가 필터 무시
+  const total = sumByYearMonth(recs);
+  const last = latestYm(total);
+  if (!last) { document.getElementById('trend-svg').innerHTML = ''; legend.innerHTML = ''; trendState = null; return; }
+
+  const keys = [];
+  let k = last;
+  for (let i = 0; i < 24; i++) { keys.unshift(k); k = prevYm(k); }
+  const keySet = new Set(keys);
+  const byC = new Map(); // country → Map(ymKey → kg)
+  for (const r of recs) {
+    const key = r[6] * 100 + r[5];
+    if (!keySet.has(key)) continue;
+    if (!byC.has(r[3])) byC.set(r[3], new Map());
+    const mm = byC.get(r[3]);
+    mm.set(key, (mm.get(key) ?? 0) + r[4]);
+  }
+  const recent12 = new Set(keys.slice(-12));
+  const tops = [...byC.entries()]
+    .map(([c, mm]) => [c, [...mm.entries()].reduce((s, [kk, v]) => s + (recent12.has(kk) ? v : 0), 0)])
+    .sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
+
+  document.getElementById('trend-sub').textContent = `최근 24개월 · 상위 4개국 (최근 12개월 물량 기준)`;
+  const cols = keys.map(kk => ({
+    label: kk % 100 === 1 ? `'${String(Math.floor(kk / 100)).slice(2)}.1` : String(kk % 100),
+    tip: `${Math.floor(kk / 100)}년 ${kk % 100}월`,
+  }));
+  const series = [...tops].reverse().map((c, i) => ({
+    name: c,
+    color: SERIES_COLORS[tops.length - 1 - i], // 1위 = slot1
+    vals: keys.map(kk => byC.get(c).get(kk) ?? null),
+  }));
+  legend.innerHTML = tops.map((c, i) =>
+    `<span class="it"><span class="sw" style="background:${SERIES_COLORS[i]}"></span>${c}</span>`).join('');
+  drawLineChart(cols, series, { xLabelStep: 2 });
+}
+
+function renderTrendMat(legend) {
+  const ym = sumByYearMonth(filtered());
+  const allKeys = [...ym.keys()].sort((a, b) => a - b);
+  if (!allKeys.length) { document.getElementById('trend-svg').innerHTML = ''; legend.innerHTML = ''; trendState = null; return; }
+  // 첫 달~마지막 달의 연속된 월 나열
+  const keys = [];
+  let k = allKeys[0];
+  const end = allKeys[allKeys.length - 1];
+  while (k <= end) { keys.push(k); k = k % 100 === 12 ? k + 89 : k + 1; }
+  // 직전 12개월(자기 자신 포함) 합 — 12개월치가 다 있을 때만 값 산출
+  const vals = keys.map((kk, i) => {
+    if (i < 11) return null;
+    let s = 0;
+    for (let j = i - 11; j <= i; j++) {
+      const v = ym.get(keys[j]);
+      if (v === undefined) return null;
+      s += v;
+    }
+    return s;
+  });
+  document.getElementById('trend-sub').textContent = '직전 12개월 합계(연환산) — 계절 등락을 걷어낸 구조적 추세';
+  const cols = keys.map(kk => ({
+    label: kk % 100 === 1 ? String(Math.floor(kk / 100)) : '',
+    tip: `${Math.floor(kk / 100)}년 ${kk % 100}월 (직전 12개월 합)`,
+  }));
+  legend.innerHTML = ''; // 단일 시리즈 — 범례 생략
+  drawLineChart(cols, [{ name: '', color: 'var(--accent)', vals, fill: true, primary: true }], { xLabelStep: 1, endNames: false });
+}
+
+// 모드 토글 + 연도 칩
+function updateTrendControls(dataYears) {
+  document.querySelectorAll('#trend-mode button').forEach(b => b.classList.toggle('on', b.dataset.m === V.mode));
+  const chips = document.getElementById('year-chips');
+  if (V.mode !== 'year') { chips.innerHTML = ''; return; }
+  const sel = selectedYears(dataYears);
+  chips.innerHTML = dataYears.map(y =>
+    `<button class="ychip${sel.includes(y) ? ' on' : ''}" data-y="${y}">${y}</button>`).join('');
+  chips.querySelectorAll('.ychip').forEach(b => b.onclick = () => {
+    const y = +b.dataset.y;
+    let ys = V.years ? V.years.filter(x => dataYears.includes(x)) : selectedYears(dataYears);
+    if (ys.includes(y)) {
+      if (ys.length > 1) ys = ys.filter(x => x !== y);
+    } else {
+      ys.push(y);                       // 선택 순서 유지
+      if (ys.length > 4) ys.shift();    // 5개째면 가장 먼저 고른 연도부터 제외
+    }
+    V.years = ys;
+    renderAll();
+  });
+}
+
+document.querySelectorAll('#trend-mode button').forEach(b => b.onclick = () => {
+  V.mode = b.dataset.m;
+  renderAll();
+});
 
 function bindTrendHover() {
   const svg = document.getElementById('trend-svg');
@@ -866,26 +1028,27 @@ function bindTrendHover() {
   const tt = document.getElementById('trend-tt');
   svg.onmousemove = e => {
     if (!trendState) return;
+    const st = trendState;
     const rect = svg.getBoundingClientRect();
-    const sx = trendState.W / rect.width;
+    const sx = st.W / rect.width;
     const px = (e.clientX - rect.left) * sx;
-    const m = Math.max(1, Math.min(12, Math.round((px - trendState.L) / (trendState.W - trendState.L - trendState.R) * 11 + 1)));
-    const x = trendState.xOf(m);
+    const idx = Math.max(0, Math.min(st.n - 1, Math.round((px - st.L) / (st.W - st.L - st.R) * (st.n - 1))));
+    const x = st.xOf(idx);
     const cross = svg.querySelector('#trend-cross');
     cross.setAttribute('x1', x); cross.setAttribute('x2', x);
     cross.setAttribute('visibility', 'visible');
 
     const dots = svg.querySelector('#trend-dots');
     let dotHtml = '', rows = '';
-    [...trendState.years].reverse().forEach((yr, i) => {
-      const p = trendState.pts.get(yr).arr.find(p => p.m === m);
+    [...st.series].reverse().forEach(s => {
+      const p = s.pts ? s.pts[idx] : null;
       if (p) {
-        dotHtml += `<circle cx="${p.x}" cy="${p.y}" r="4.5" fill="${trendState.pts.get(yr).color}" stroke="#fff" stroke-width="2"/>`;
-        rows += `<div class="tt-row"><span class="lft"><span class="sw" style="width:8px;height:8px;border-radius:2px;display:inline-block;background:${trendState.pts.get(yr).color}"></span>${yr}년</span><b>${tons(p.v)} t</b></div>`;
+        dotHtml += `<circle cx="${p.x}" cy="${p.y}" r="4.5" fill="${s.color}" stroke="#fff" stroke-width="2"/>`;
+        rows += `<div class="tt-row"><span class="lft"><span class="sw" style="width:8px;height:8px;border-radius:2px;display:inline-block;background:${s.color}"></span>${s.name || '이동합'}</span><b>${tons(p.v)} t</b></div>`;
       }
     });
     dots.innerHTML = dotHtml;
-    tt.innerHTML = `<div class="tt-title">${m}월</div>` + (rows || '<div class="tt-row">데이터 없음</div>');
+    tt.innerHTML = `<div class="tt-title">${st.cols[idx].tip}</div>` + (rows || '<div class="tt-row">데이터 없음</div>');
     tt.style.display = 'block';
     const bw = box.clientWidth, tw = tt.offsetWidth;
     let lx = (e.clientX - rect.left) + 14;
@@ -958,11 +1121,18 @@ function renderCountry() {
     `최근 12개월 합계 (${Math.floor(start / 100)}년 ${start % 100}월 ~ ${Math.floor(last / 100)}년 ${last % 100}월)`;
 
   box.innerHTML = top.map(([name, v]) => `
-    <div class="hbar" title="${name}: ${tons(v)} t (${(v / total * 100).toFixed(1)}%)">
+    <div class="hbar${name === '기타' ? '' : ' clickable'}" ${name === '기타' ? '' : `data-c="${name}"`} title="${name}: ${tons(v)} t (${(v / total * 100).toFixed(1)}%)${name === '기타' ? '' : ' · 클릭하면 이 국가로 필터'}">
       <div class="name">${name}</div>
       <div class="track"><div class="fill${name === '기타' ? ' etc' : ''}" style="width:${Math.max(1, v / maxV * 100)}%"></div></div>
       <div class="val"><b>${tons(v)}</b> t<span class="pct">${(v / total * 100).toFixed(1)}%</span></div>
     </div>`).join('');
+
+  // 드릴다운: 바 클릭 → 해당 국가로 필터
+  box.querySelectorAll('.hbar.clickable').forEach(el => el.onclick = () => {
+    F.country = F.country === el.dataset.c ? '' : el.dataset.c; // 같은 국가 재클릭 시 해제
+    document.getElementById('f-country').value = F.country;
+    renderAll();
+  });
 }
 
 // ---------------------------------------------------------------- 연도별 바
