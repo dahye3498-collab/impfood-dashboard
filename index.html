@@ -110,6 +110,47 @@
   .btn.sec { background: var(--surface); border-color: var(--line-strong); color: var(--text-1); }
   .btn.sec:hover { background: var(--bg-soft); border-color: var(--text-3); box-shadow: var(--shadow-xs); transform: none; }
   .btn:disabled { opacity: 0.5; cursor: default; }
+  .btn.xs { padding: 4px 10px; font-size: 12px; font-weight: 500; }
+  .btn.xs.done { color: var(--success-text); border-color: var(--accent-soft-2); background: var(--success-soft); }
+
+  /* ----- 카드 헤더 액션 ----- */
+  .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .card-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+  /* ----- 즐겨찾기 프리셋 ----- */
+  .presets { display: flex; gap: 7px; flex-wrap: wrap; margin: 0 0 12px; }
+  .presets:empty { display: none; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 11px; border-radius: var(--radius-pill); cursor: pointer;
+    background: var(--accent-soft); color: var(--accent-text);
+    font-size: 12px; font-weight: 600; border: 1px solid transparent;
+    transition: all 0.13s ease;
+  }
+  .chip:hover { background: var(--accent-soft-2); }
+  .chip.active { border-color: var(--accent); }
+  .chip .x { font-weight: 400; opacity: 0.55; padding: 0 1px; }
+  .chip .x:hover { opacity: 1; }
+  .chip.add { background: none; border: 1px dashed var(--line-strong); color: var(--text-3); font-weight: 500; }
+  .chip.add:hover { color: var(--accent-text); border-color: var(--accent); }
+
+  /* ----- 브리핑 카드 ----- */
+  .card.brief { border-left: 3px solid var(--accent); margin: 0 0 12px; }
+  .brief-label { font-size: 11px; font-weight: 700; color: var(--accent-text); letter-spacing: 0.05em; text-transform: uppercase; }
+  .brief-text { font-size: 14.5px; line-height: 1.65; margin-top: 5px; }
+  .brief-text b { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .brief-signals { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 9px; }
+  .brief-signals:empty { display: none; }
+  .sig {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: var(--radius-pill);
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    border: 1px solid transparent; transition: all 0.13s ease;
+  }
+  .sig.up { background: var(--success-soft); color: var(--success-text); }
+  .sig.down { background: var(--danger-soft); color: var(--danger-text); }
+  .sig.new { background: var(--info-soft); color: var(--info-text); }
+  .sig:hover { border-color: currentColor; }
 
   /* ----- 스탯 ----- */
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 9px; margin-bottom: 12px; }
@@ -246,7 +287,16 @@
       <div class="fgroup"><span class="label-uppercase">부위</span><select id="f-part"></select></div>
       <div class="fgroup"><span class="label-uppercase">국가</span><select id="f-country"></select></div>
       <button class="btn sec" id="f-reset">초기화</button>
+      <button class="btn sec" id="f-share" title="현재 화면 그대로 열리는 링크를 복사합니다">링크 복사</button>
     </div>
+  </div>
+
+  <div class="presets" id="presets"></div>
+
+  <div class="card brief" id="brief-card" style="display:none">
+    <div class="brief-label">이번 달 브리핑</div>
+    <div class="brief-text" id="brief-text"></div>
+    <div class="brief-signals" id="brief-signals"></div>
   </div>
 
   <div class="stats" id="tiles"></div>
@@ -263,8 +313,13 @@
 
   <div class="row2">
     <div class="card">
-      <h2>국가별 검역량</h2>
-      <div class="sub" id="country-sub">최근 12개월 합계</div>
+      <div class="card-head">
+        <div><h2>국가별 검역량</h2><div class="sub" id="country-sub">최근 12개월 합계</div></div>
+        <div class="card-actions">
+          <button class="btn sec xs" data-export="country" data-mode="copy">복사</button>
+          <button class="btn sec xs" data-export="country" data-mode="csv">CSV</button>
+        </div>
+      </div>
       <div class="hbars" id="country-bars"></div>
     </div>
     <div class="card">
@@ -278,8 +333,13 @@
   </div>
 
   <div class="card">
-    <h2>월별 상세 <span class="badge gray">톤</span></h2>
-    <div class="sub">위 추이 차트와 동일한 데이터의 표 보기</div>
+    <div class="card-head">
+      <div><h2>월별 상세 <span class="badge gray">톤</span></h2><div class="sub">위 추이 차트와 동일한 데이터의 표 보기</div></div>
+      <div class="card-actions">
+        <button class="btn sec xs" data-export="pivot" data-mode="copy">복사</button>
+        <button class="btn sec xs" data-export="pivot" data-mode="csv">CSV</button>
+      </div>
+    </div>
     <div class="tbl-scroll"><table class="dt" id="pivot"></table></div>
   </div>
 
@@ -323,6 +383,7 @@ async function load() {
   for (const f of files) for (const r of f.records) S.records.push([...r, f.year]);
   try { S.fta = await (await fetch('data/fta.json')).json(); } catch (e) { S.fta = null; }
   try { S.config = await (await fetch('data/config.json')).json(); } catch (e) { S.config = {}; }
+  restoreState();
   initFilters();
   initAi();
   renderAll();
@@ -381,16 +442,220 @@ function renderAll() {
   const ym = sumByYearMonth(recs);
   const dataYears = uniq(recs.map(r => r[6])).sort((a, b) => a - b);
   const trendYears = dataYears.slice(-4);          // 최근 4개 연도
+  renderBriefing(ym);
   renderTiles(ym, dataYears);
   renderTrend(ym, trendYears);
   renderPivot(ym, trendYears);
   renderCountry();
   renderYearly(ym, dataYears);
   renderFta();
+  renderPresets();
+  saveState();
   const last = latestYm(ym);
   document.getElementById('meta').textContent =
     `${last ? `${Math.floor(last / 100)}년 ${last % 100}월 기준` : ''} · 갱신 ${new Date(S.updatedAt).toLocaleDateString('ko-KR')}`;
 }
+
+// ---------------------------------------------------------------- 필터 상태 저장·복원 (URL 해시 + localStorage)
+const FKEYS = [['prod', 'p'], ['gubun', 'g'], ['part', 'b'], ['country', 'c']];
+
+function saveState() {
+  const q = new URLSearchParams();
+  for (const [k, s] of FKEYS) if (F[k]) q.set(s, F[k]);
+  const h = q.toString();
+  history.replaceState(null, '', h ? '#' + h : location.pathname + location.search);
+  try { localStorage.setItem('impfood.filter', JSON.stringify(F)); } catch (e) {}
+}
+
+function restoreState() {
+  let src = null;
+  if (location.hash.length > 1) {
+    const q = new URLSearchParams(location.hash.slice(1));
+    src = {}; for (const [k, s] of FKEYS) src[k] = q.get(s) || '';
+  } else {
+    try { src = JSON.parse(localStorage.getItem('impfood.filter')); } catch (e) {}
+  }
+  applyFilterState(src);
+}
+
+// 저장된 필터 조합을 현재 데이터에 맞게 검증하며 적용
+function applyFilterState(src) {
+  if (!src || !src.prod) return false;
+  if (!S.records.some(r => r[0] === src.prod)) return false;
+  F.prod = src.prod;
+  const base = S.records.filter(r => r[0] === F.prod);
+  F.gubun = src.gubun && base.some(r => r[1] === src.gubun) ? src.gubun : '';
+  F.part = src.part && base.some(r => r[2] === src.part) ? src.part : '';
+  F.country = src.country && base.some(r => r[3] === src.country) ? src.country : '';
+  return true;
+}
+
+// ---------------------------------------------------------------- 즐겨찾기 프리셋
+function getPresets() { try { return JSON.parse(localStorage.getItem('impfood.presets')) || []; } catch (e) { return []; } }
+function savePresets(p) { try { localStorage.setItem('impfood.presets', JSON.stringify(p)); } catch (e) {} }
+function presetName(f) { return [f.prod, f.gubun, f.part, f.country].filter(Boolean).join('·'); }
+
+function renderPresets() {
+  const box = document.getElementById('presets');
+  const ps = getPresets();
+  const curName = presetName(F);
+  let html = ps.map((p, i) =>
+    `<span class="chip${presetName(p) === curName ? ' active' : ''}" data-i="${i}" title="클릭하면 이 조건으로 전환">${presetName(p)}<span class="x" data-x="${i}" title="삭제">×</span></span>`).join('');
+  if (!ps.some(p => presetName(p) === curName) && ps.length < 6) {
+    html += `<span class="chip add" id="preset-add" title="현재 필터 조합을 즐겨찾기로 저장">＋ 현재 조건 저장</span>`;
+  }
+  box.innerHTML = html;
+
+  box.querySelectorAll('.chip[data-i]').forEach(ch => ch.onclick = e => {
+    if (e.target.dataset.x !== undefined) {
+      const ps2 = getPresets(); ps2.splice(+e.target.dataset.x, 1); savePresets(ps2); renderPresets(); return;
+    }
+    const p = getPresets()[+ch.dataset.i];
+    if (p && applyFilterState(p)) {
+      document.getElementById('f-prod').value = F.prod;
+      syncDependentFilters();
+      renderAll();
+    }
+  });
+  const add = document.getElementById('preset-add');
+  if (add) add.onclick = () => { const ps2 = getPresets(); ps2.push({ ...F }); savePresets(ps2); renderPresets(); };
+}
+
+// ---------------------------------------------------------------- 이번 달 브리핑
+function renderBriefing(ym) {
+  const card = document.getElementById('brief-card');
+  const last = latestYm(ym);
+  if (!last) { card.style.display = 'none'; return; }
+  const y = Math.floor(last / 100), m = last % 100;
+  const cur = ym.get(last) ?? 0;
+  const momP = ym.get(prevYm(last)), yoyP = ym.get(last - 100);
+  const fmtPct = (a, b) => (a >= b ? '+' : '−') + Math.abs((a - b) / b * 100).toFixed(1) + '%';
+
+  let txt = `${y}년 ${m}월 <b>${F.prod}</b>${F.part ? ' ' + F.part : ''}${F.gubun ? ' (' + F.gubun + ')' : ''}${F.country ? ' — ' + F.country : ''} 검역량은 <b>${tons(cur)}t</b>`;
+  const bits = [];
+  if (momP) bits.push(`전월 대비 <b>${fmtPct(cur, momP)}</b>`);
+  if (yoyP) bits.push(`전년 동월 대비 <b>${fmtPct(cur, yoyP)}</b>`);
+  txt += bits.length ? `로, ${bits.join(', ')}입니다.` : '입니다.';
+  let ytd = 0, ytdPrev = 0;
+  for (let i = 1; i <= m; i++) { ytd += ym.get(y * 100 + i) ?? 0; ytdPrev += ym.get((y - 1) * 100 + i) ?? 0; }
+  if (ytdPrev) txt += ` 1~${m}월 누계는 <b>${tons(ytd)}t</b>(전년 동기 <b>${fmtPct(ytd, ytdPrev)}</b>).`;
+  document.getElementById('brief-text').innerHTML = txt;
+
+  const sigBox = document.getElementById('brief-signals');
+  sigBox.innerHTML = buildSignals(last).map(s =>
+    `<span class="sig ${s.cls}" data-country="${s.country}" title="클릭하면 ${s.country}(으)로 필터">${s.text}</span>`).join('');
+  sigBox.querySelectorAll('.sig').forEach(el => el.onclick = () => {
+    F.country = el.dataset.country;
+    document.getElementById('f-country').value = F.country;
+    renderAll();
+  });
+  card.style.display = '';
+}
+
+// 국가별 자동 신호: 연속 증감(3개월+), 전년 동월 대비 ±30%, 신규 원산지
+function buildSignals(last) {
+  const byCountry = new Map();
+  for (const r of filtered(true)) {
+    if (!byCountry.has(r[3])) byCountry.set(r[3], new Map());
+    const mm = byCountry.get(r[3]);
+    const k = r[6] * 100 + r[5];
+    mm.set(k, (mm.get(k) ?? 0) + r[4]);
+  }
+  const signals = [];
+  for (const [c, mm] of byCountry) {
+    const cur = mm.get(last) ?? 0;
+    if (cur < 20000) continue; // 월 20t 미만은 노이즈로 제외
+
+    let seen = false, kk = prevYm(last);
+    for (let i = 0; i < 12; i++) { if ((mm.get(kk) ?? 0) > 0) { seen = true; break; } kk = prevYm(kk); }
+    if (!seen) { signals.push({ cls: 'new', country: c, text: `신규 원산지 ${c} · ${tons(cur)}t`, mag: cur * 2 }); continue; }
+
+    let up = 0, down = 0, k = last;
+    for (let i = 0; i < 6; i++) {
+      const a = mm.get(k) ?? 0, b = mm.get(prevYm(k)) ?? 0;
+      if (b === 0) break;
+      if (a > b && down === 0) up++;
+      else if (a < b && up === 0) down++;
+      else break;
+      k = prevYm(k);
+    }
+    const yoy = mm.get(last - 100);
+    if (up >= 3) signals.push({ cls: 'up', country: c, text: `${c} ${up}개월 연속 증가`, mag: cur * 1.5 });
+    else if (down >= 3) signals.push({ cls: 'down', country: c, text: `${c} ${down}개월 연속 감소`, mag: cur * 1.5 });
+    else if (yoy && yoy > 0) {
+      const pct = (cur - yoy) / yoy * 100;
+      if (pct >= 30) signals.push({ cls: 'up', country: c, text: `${c} 전년 동월 +${pct.toFixed(0)}%`, mag: cur });
+      else if (pct <= -30) signals.push({ cls: 'down', country: c, text: `${c} 전년 동월 −${Math.abs(pct).toFixed(0)}%`, mag: cur });
+    }
+  }
+  return signals.sort((a, b) => b.mag - a.mag).slice(0, 4);
+}
+
+// ---------------------------------------------------------------- CSV 내려받기 · 표 복사
+function exportRows(kind) {
+  if (kind === 'pivot') {
+    const recs = filtered();
+    const ym = sumByYearMonth(recs);
+    const years = uniq(recs.map(r => r[6])).sort((a, b) => a - b).slice(-4);
+    const rows = [['월', ...years.map(y => y + '년')]];
+    for (let m = 1; m <= 12; m++) rows.push([m + '월', ...years.map(y => { const v = ym.get(y * 100 + m); return v !== undefined ? Math.round(v / 1000) : ''; })]);
+    rows.push(['합계', ...years.map(y => { let s = 0, n = 0; for (let m = 1; m <= 12; m++) { const v = ym.get(y * 100 + m); if (v !== undefined) { s += v; n++; } } return n ? Math.round(s / 1000) : ''; })]);
+    return rows;
+  }
+  const recs = filtered(true);
+  const ym = sumByYearMonth(recs);
+  const last = latestYm(ym);
+  const win = new Set(); let k = last;
+  for (let i = 0; i < 12; i++) { win.add(k); k = prevYm(k); }
+  const byC = new Map(); let total = 0;
+  for (const r of recs) { const key = r[6] * 100 + r[5]; if (!win.has(key)) continue; byC.set(r[3], (byC.get(r[3]) ?? 0) + r[4]); total += r[4]; }
+  const rows = [['국가', '검역량(t)', '비중(%)']];
+  [...byC.entries()].sort((a, b) => b[1] - a[1]).forEach(([c, v]) => rows.push([c, Math.round(v / 1000), (v / total * 100).toFixed(1)]));
+  return rows;
+}
+
+function exportFilename(kind) {
+  const parts = ['검역통계', kind === 'country' ? '국가별' : '월별', F.prod, F.gubun, F.part, F.country].filter(Boolean);
+  const last = latestYm(sumByYearMonth(filtered()));
+  if (last) parts.push(`${Math.floor(last / 100)}-${String(last % 100).padStart(2, '0')}`);
+  return parts.join('_') + '.csv';
+}
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove();
+  }
+}
+
+function flashDone(btn, label) {
+  const t = btn.textContent;
+  btn.textContent = label; btn.classList.add('done');
+  setTimeout(() => { btn.textContent = t; btn.classList.remove('done'); }, 1600);
+}
+
+document.querySelectorAll('[data-export]').forEach(btn => btn.onclick = async () => {
+  const rows = exportRows(btn.dataset.export);
+  if (btn.dataset.mode === 'csv') {
+    const esc = c => /[",\n]/.test(String(c)) ? '"' + String(c).replace(/"/g, '""') + '"' : c;
+    const csv = rows.map(r => r.map(esc).join(',')).join('\r\n');
+    const blob = new Blob(['\u{FEFF}' + csv], { type: 'text/csv;charset=utf-8' }); // BOM: 엑셀 한글 호환
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = exportFilename(btn.dataset.export);
+    a.click(); URL.revokeObjectURL(a.href);
+    flashDone(btn, '저장됨 ✓');
+  } else {
+    await copyText(rows.map(r => r.join('\t')).join('\n')); // 탭 구분 — 엑셀에 그대로 붙여넣기
+    flashDone(btn, '복사됨 ✓');
+  }
+});
+
+document.getElementById('f-share').onclick = async function () {
+  await copyText(location.href);
+  flashDone(this, '복사됨 ✓');
+};
 
 function latestYm(ym) {
   let max = 0;
