@@ -296,6 +296,12 @@
   table.heat th.l, table.heat td.l { text-align: right; padding-right: 8px; font-family: var(--font-mono); color: var(--text-2); }
   table.heat tr.avg td { border-top: 2px solid var(--line-strong); }
   table.heat td.na { color: var(--text-4); background: var(--bg-sub); }
+  .heat-legend {
+    display: flex; align-items: center; gap: 8px; margin-top: 10px;
+    font-size: 11.5px; color: var(--text-3); flex-wrap: wrap;
+  }
+  .heat-legend .grad { width: 140px; height: 10px; border-radius: 5px; border: 1px solid var(--line); }
+  .heat-legend .hnote { margin-left: 4px; color: var(--text-4); }
 
   /* ----- 국가 점유율 ----- */
   .share-rows { display: flex; flex-direction: column; gap: 7px; margin-top: 12px; }
@@ -457,6 +463,7 @@
       <div><h2>계절성 히트맵 <span class="badge gray">톤</span></h2><div class="sub" id="season-sub"></div></div>
     </div>
     <div class="tbl-scroll"><table class="dt heat" id="heatmap"></table></div>
+    <div class="heat-legend" id="heat-legend"></div>
   </div>
 
   <div class="card">
@@ -1295,7 +1302,7 @@ function renderHeatmap(ym, dataYears) {
   const tbl = document.getElementById('heatmap');
   const sub = document.getElementById('season-sub');
   const years = dataYears.slice(-10);
-  if (!years.length) { tbl.innerHTML = ''; sub.textContent = ''; return; }
+  if (!years.length) { tbl.innerHTML = ''; sub.textContent = ''; document.getElementById('heat-legend').innerHTML = ''; return; }
 
   let maxV = 0;
   for (const y of years) for (let m = 1; m <= 12; m++) maxV = Math.max(maxV, ym.get(y * 100 + m) ?? 0);
@@ -1323,6 +1330,13 @@ function renderHeatmap(ym, dataYears) {
     Array.from({ length: 12 }, (_, i) => cell(avgOf(i + 1))).join('') + '</tr>';
   tbl.innerHTML = html;
   tbl.querySelectorAll('td.mclick').forEach(td => td.onclick = () => showMonthDetail(+td.dataset.y, +td.dataset.m));
+
+  // 색 범례 — 스케일 기준은 현재 표의 최댓값 (필터를 바꾸면 기준도 바뀜)
+  const stops = Array.from({ length: 7 }, (_, i) => heatColor(i / 6)).join(', ');
+  document.getElementById('heat-legend').innerHTML =
+    `<span>0</span><span class="grad" style="background:linear-gradient(90deg, ${stops})"></span>` +
+    `<span>최대 <b>${tons(maxV)}t</b></span>` +
+    `<span class="hnote">색은 이 표의 최댓값 대비 비율 — 필터가 다르면 진하기를 서로 비교할 수 없음</span>`;
 
   // 평년 대비 시그널
   if (last) {
