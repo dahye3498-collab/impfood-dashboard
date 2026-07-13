@@ -103,6 +103,27 @@ wtCnt6). 1월에는 둘이 같아서 혼동하기 쉽습니다. 구 GAS 백필�
 - **소부산물·돼지부산물**: 이 API에 없어 자동 수집 불가 (구 시스템에서도 별도 출처에서
   수동 입력). 2026년 6월까지의 이력만 있으며, 이후 입력 경로는 미정.
 
+## 인수인계 — 새 담당자 셋업 (약 15분)
+
+수집은 반드시 **한국 IP의 윈도우 PC**에서 돌아야 합니다. 새 담당자 PC에서:
+
+1. **설치**: [Node.js](https://nodejs.org) (LTS), [Git](https://git-scm.com), [GitHub CLI](https://cli.github.com)
+2. **GitHub 로그인**: PowerShell에서 `gh auth login` (본인 GitHub 계정, HTTPS 선택)
+3. **저장소 받기**: `gh repo clone <소유자>/impfood-dashboard` (원하는 폴더에서)
+4. **자동 수집 등록**: 저장소 폴더에서 `.\scripts\예약등록.ps1` 실행
+   → 매월 1일·15일 10:00 자동 수집이 등록됨 (클론 위치가 어디든 동작)
+5. **테스트**: `scripts\수집실행.cmd` 더블클릭 → `logs\` 폴더에 "완료" 로그 확인
+
+저장소 소유권 이전(기존 소유자 GitHub → Settings → General → Danger Zone →
+Transfer ownership) 후에는:
+
+- 새 소유자 계정에서 **Settings → Pages**가 켜져 있는지 확인 (branch: main, / root)
+- **대시보드 주소가 바뀝니다**: `<새소유자>.github.io/impfood-dashboard` — 북마크 공지 필요
+- ⚠ 새 소유자가 무료 플랜이면 비공개 저장소로는 Pages를 못 씁니다 — 저장소를
+  공개로 전환하거나(데이터는 공공 통계라 무방) 유료 플랜 필요
+
+기존 PC 정리: 저장소 폴더에서 `.\scripts\예약해제.ps1` 실행 (예약 작업 삭제) 후 폴더 삭제.
+
 ## 문제가 생기면
 
 | 증상 | 확인 |

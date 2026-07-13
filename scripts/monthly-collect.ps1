@@ -1,7 +1,8 @@
 ﻿# 매월 자동 수집 (윈도우 예약 작업용)
 # 식약처 API가 해외 IP를 차단해서 GitHub Actions 대신 로컬에서 수집한다.
 $ErrorActionPreference = "Continue"
-$repo = "C:\dev\impfood-dashboard"
+# 저장소 위치는 이 스크립트의 위치에서 자동 계산 — 어디에 클론해도 동작
+$repo = Split-Path $PSScriptRoot -Parent
 $logDir = Join-Path $repo "logs"
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory $logDir | Out-Null }
 $log = Join-Path $logDir ("collect-" + (Get-Date -Format "yyyyMM") + ".log")
