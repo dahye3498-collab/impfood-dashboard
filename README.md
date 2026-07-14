@@ -37,7 +37,8 @@ data/manifest.json             연도 목록·갱신일시 (수집기가 자동 
 data/fta.json                  FTA 할당관세 — 수동 관리
 data/config.json               AI 질문 기능 설정 (ai_endpoint)
 index.html                     대시보드 전체 (정적 단일 파일, 빌드 불필요)
-scripts/collect.mjs            수집기
+scripts/collect.mjs            정육 수집기 (식약처 API, 자동)
+scripts/collect-byproducts.mjs 부산물 수집기 (QIA 엑셀 → 해당월 교체, 수동)
 scripts/store.mjs              데이터 저장 공통 모듈
 scripts/monthly-collect.ps1    예약 작업이 실행하는 스크립트 (수집→커밋→푸시)
 scripts/수집실행.cmd            수동 수집 (더블클릭)
@@ -100,8 +101,14 @@ wtCnt6). 1월에는 둘이 같아서 혼동하기 쉽습니다. 구 GAS 백필�
 
 - **FTA 할당관세** (`data/fta.json`): GitHub에서 직접 수정 → 자동 반영.
   **사용률(usage_pct)을 갱신할 때 확인 날짜(as_of)도 함께 수정**해야 소진 예측이 맞습니다.
-- **소부산물·돼지부산물**: 이 API에 없어 자동 수집 불가 (구 시스템에서도 별도 출처에서
-  수동 입력). 2026년 6월까지의 이력만 있으며, 이후 입력 경로는 미정.
+- **소부산물·돼지부산물**: 식약처 API에 없어 자동 수집 불가. 농림축산검역본부 QIA
+  (https://eminwon.qia.go.kr/statistics/statistics_No2.do)에서 매달 수동 반영한다.
+  1. QIA: 통계분류=수입축산물, 품목=육류, **검사기간=해당월~해당월(반드시 단월)** → 엑셀 다운로드
+  2. `node scripts/collect-byproducts.mjs <다운받은.xls> <연도> <월>` (미리보기는 `--dry`)
+  3. `git add data && git commit && git push`
+  - ⚠ 검사기간을 단월로 두지 않으면 누계(YTD)가 그 달 값으로 들어가 오염된다(스크립트가 자동 차단).
+  - 추적 부위: (소) 안창토시·우건·꼬리·볼살·깐양홍창·곱창대창·뼈 / (돼지) 갈매기·돼지머리·장족단족·목뼈등뼈·곱창막창.
+    QIA 품명↔부위 매핑은 스크립트 상단에 있음. 물량 적은 부위(우족·소간·소심장 등)는 의도적으로 제외.
 
 ## 인수인계 — 새 담당자 셋업 (약 15분)
 
