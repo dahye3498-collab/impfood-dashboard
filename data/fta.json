@@ -1,7 +1,5 @@
 {
   "_설명": "FTA 할당관세 데이터 — 수동 관리. GitHub에서 직접 수정하거나 로컬에서 수정 후 커밋하세요. as_of는 사용률을 확인한 날짜(소진 페이스 예측의 기준점)입니다.",
-  "2023": { "quota_mt": 184792, "remaining_mt": 0, "usage_pct": null },
-  "2024": { "quota_mt": 188414, "remaining_mt": 0, "usage_pct": null },
   "2025": { "quota_mt": 192206, "remaining_mt": 0, "usage_pct": 116.8 },
-  "2026": { "quota_mt": 196050, "remaining_mt": 14612.44, "usage_pct": 92.55, "as_of": "2026-07-10" }
+  "2026": { "quota_mt": 196050, "remaining_mt": 4030.43, "usage_pct": 97.94, "as_of": "2026-07-14" }
 }
