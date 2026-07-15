@@ -512,8 +512,8 @@
 // ---------------------------------------------------------------- 데이터 로드
 const S = { records: [], years: [], fta: null, updatedAt: null };
 const F = { prod: '소정육', gubun: '', part: '', country: '' };  // ''=전체
-// Sage 시리즈: 최신 연도 = accent, 이후 info/warm/danger
-const SERIES_COLORS = ['var(--accent)', 'var(--info)', 'var(--warm)', 'var(--danger)'];
+// Sage 시리즈: 최신 연도 = accent, 이후 info/warm/danger/violet
+const SERIES_COLORS = ['var(--accent)', 'var(--info)', 'var(--warm)', 'var(--danger)', '#8a7fc9'];
 const AREA_FILL = 'rgba(90,152,116,0.10)';
 
 const fmtInt = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 });
@@ -630,7 +630,7 @@ function restoreState() {
   }
   if (src) {
     if (['year', 'country', 'mat'].includes(src._vm)) V.mode = src._vm;
-    if (Array.isArray(src._yrs) && src._yrs.length) V.years = src._yrs.slice(0, 4);
+    if (Array.isArray(src._yrs) && src._yrs.length) V.years = src._yrs.slice(0, 5);
   }
   applyFilterState(src);
 }
@@ -883,11 +883,11 @@ function fitViewBox(svg, cssH) {
   return W;
 }
 
-// 선택된 비교 연도 (최대 4개, 표시용은 오름차순)
+// 선택된 비교 연도 (최대 5개, 표시용은 오름차순)
 function selectedYears(dataYears) {
   let ys = (V.years || []).filter(y => dataYears.includes(y));
-  if (!ys.length) ys = dataYears.slice(-4);
-  return [...ys].sort((a, b) => a - b).slice(-4);
+  if (!ys.length) ys = dataYears.slice(-5);
+  return [...ys].sort((a, b) => a - b).slice(-5);
 }
 
 // ---- 공통 라인차트 스캐폴드 ----
@@ -991,7 +991,7 @@ function renderTrend(ym, dataYears) {
 function renderTrendYears(ym, dataYears, legend) {
   const years = selectedYears(dataYears);
   document.getElementById('trend-sub').textContent =
-    years.length ? `${years[0]}~${years[years.length - 1]}년 월별 비교 · 아래 연도 칩으로 비교 대상 선택 (최대 4개)` : '';
+    years.length ? `${years[0]}~${years[years.length - 1]}년 월별 비교 · 아래 연도 칩으로 비교 대상 선택 (최대 5개)` : '';
   if (!years.length) { document.getElementById('trend-svg').innerHTML = ''; legend.innerHTML = ''; trendState = null; return; }
 
   const cols = Array.from({ length: 12 }, (_, i) => ({ label: `${i + 1}월`, tip: `${i + 1}월` }));
@@ -1089,7 +1089,7 @@ function updateTrendControls(dataYears) {
       if (ys.length > 1) ys = ys.filter(x => x !== y);
     } else {
       ys.push(y);                       // 선택 순서 유지
-      if (ys.length > 4) ys.shift();    // 5개째면 가장 먼저 고른 연도부터 제외
+      if (ys.length > 5) ys.shift();    // 6개째면 가장 먼저 고른 연도부터 제외
     }
     V.years = ys;
     renderAll();
