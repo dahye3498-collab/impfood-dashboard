@@ -394,6 +394,7 @@
       <button class="btn sec" id="f-reset">초기화</button>
       <button class="btn sec" id="f-share" title="현재 화면 그대로 열리는 링크를 복사합니다">링크 복사</button>
       <button class="btn sec" id="f-print" title="A4 보고서 형태로 인쇄·PDF 저장">인쇄</button>
+      <button class="btn sec" data-export="raw" data-mode="csv" title="전 품목(소·돼지 정육/부산물·양·염소) 원본 데이터를 CSV로 — 엑셀에서 국가×품목 피벗용. 국가 필터만 적용됩니다">원본 CSV</button>
     </div>
   </div>
 
@@ -752,6 +753,17 @@ function buildSignals(last) {
 
 // ---------------------------------------------------------------- CSV 내려받기 · 표 복사
 function exportRows(kind) {
+  if (kind === 'raw') {
+    // 전 품목 원본 (피벗용). 품명은 단일선택이라 일부러 무시하고 전 품목을 담는다 — 국가 필터만 적용.
+    const rows = [['품명', '구분', '부위', '국가', '검역량(kg)', '연도', '월']];
+    const recs = S.records.filter(r => !F.country || r[3] === F.country);
+    recs.sort((a, b) =>
+      (a[6] - b[6]) || (a[5] - b[5]) ||
+      a[0].localeCompare(b[0], 'ko') || a[1].localeCompare(b[1], 'ko') ||
+      a[2].localeCompare(b[2], 'ko') || a[3].localeCompare(b[3], 'ko'));
+    for (const r of recs) rows.push([r[0], r[1], r[2], r[3], r[4], r[6], r[5]]);
+    return rows;
+  }
   if (kind === 'pivot') {
     const recs = filtered();
     const ym = sumByYearMonth(recs);
@@ -776,6 +788,11 @@ function exportRows(kind) {
 }
 
 function exportFilename(kind) {
+  if (kind === 'raw') {
+    const parts = ['검역통계', '원본전체', F.country].filter(Boolean);
+    if (S.years.length) parts.push(`${S.years[0]}-${S.years[S.years.length - 1]}`);
+    return parts.join('_') + '.csv';
+  }
   const parts = ['검역통계', kind === 'country' ? '국가별' : '월별', F.prod, F.gubun, F.part, F.country].filter(Boolean);
   const last = latestYm(sumByYearMonth(filtered()));
   if (last) parts.push(`${Math.floor(last / 100)}-${String(last % 100).padStart(2, '0')}`);
