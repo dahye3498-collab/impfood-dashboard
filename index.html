@@ -1028,9 +1028,9 @@ function renderTrendCountry(legend) {
   const recent12 = new Set(keys.slice(-12));
   const tops = [...byC.entries()]
     .map(([c, mm]) => [c, [...mm.entries()].reduce((s, [kk, v]) => s + (recent12.has(kk) ? v : 0), 0)])
-    .sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
+    .sort((a, b) => b[1] - a[1]).slice(0, 5).map(e => e[0]);
 
-  document.getElementById('trend-sub').textContent = `최근 24개월 · 상위 4개국 (최근 12개월 물량 기준)`;
+  document.getElementById('trend-sub').textContent = `최근 24개월 · 상위 5개국 (최근 12개월 물량 기준)`;
   const cols = keys.map(kk => ({
     label: kk % 100 === 1 ? `'${String(Math.floor(kk / 100)).slice(2)}.1` : String(kk % 100),
     tip: `${Math.floor(kk / 100)}년 ${kk % 100}월`,
