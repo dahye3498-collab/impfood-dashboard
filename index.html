@@ -955,8 +955,9 @@ function drawLineChart(cols, series, opts = {}) {
     if (s.fill && segments === 1 && firstP && lastP) {
       g += `<path d="${d}L${lastP.x.toFixed(1)},${T + ph} L${firstP.x.toFixed(1)},${T + ph} Z" fill="${AREA_FILL}" stroke="none"/>`;
     }
-    g += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>`;
-    if (drawDots) for (const p of s.pts) if (p) g += `<circle cx="${p.x}" cy="${p.y}" r="2.2" fill="${s.color}"/>`;
+    // dash 지정 시 기준선(평년 등) — 얇은 점선, 점 표시 생략
+    g += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.dash ? 1.6 : 2.2}" stroke-linejoin="round" stroke-linecap="round"${s.dash ? ` stroke-dasharray="${s.dash}"` : ''}/>`;
+    if (drawDots && !s.dash) for (const p of s.pts) if (p) g += `<circle cx="${p.x}" cy="${p.y}" r="2.2" fill="${s.color}"/>`;
     if (lastP) {
       g += `<circle cx="${lastP.x}" cy="${lastP.y}" r="3.2" fill="${s.color}"/>`;
       endLabels.push({ x: lastP.x, y: lastP.y, name: s.name, primary: !!s.primary, v: lastP.v });
@@ -1008,7 +1009,7 @@ function renderTrend(ym, dataYears) {
 function renderTrendYears(ym, dataYears, legend) {
   const years = selectedYears(dataYears);
   document.getElementById('trend-sub').textContent =
-    years.length ? `${years[0]}~${years[years.length - 1]}년 월별 비교 · 아래 연도 칩으로 비교 대상 선택 (최대 5개)` : '';
+    years.length ? `${years[0]}~${years[years.length - 1]}년 월별 비교 · 점선=평년 · 아래 연도 칩으로 비교 대상 선택 (최대 5개)` : '';
   if (!years.length) { document.getElementById('trend-svg').innerHTML = ''; legend.innerHTML = ''; trendState = null; return; }
 
   const cols = Array.from({ length: 12 }, (_, i) => ({ label: `${i + 1}월`, tip: `${i + 1}월` }));
@@ -1019,8 +1020,21 @@ function renderTrendYears(ym, dataYears, legend) {
     fill: i === years.length - 1,
     primary: i === years.length - 1,
   }));
+
+  // 평년 기준선 = 최근 5개 완결 연도의 월평균 (계절성 히트맵의 '평년'과 동일 정의)
+  const lastYm = latestYm(ym);
+  const curYear = lastYm ? Math.floor(lastYm / 100) : null;
+  const baseYears = dataYears.slice(-10).filter(y => y !== curYear).slice(-5);
+  const normVals = cols.map((_, m) => {
+    const vs = baseYears.map(y => ym.get(y * 100 + m + 1)).filter(v => v !== undefined);
+    return vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length : null;
+  });
+  const hasNorm = baseYears.length > 0 && normVals.some(v => v != null);
+  if (hasNorm) series.unshift({ name: '평년', color: 'var(--text-3)', vals: normVals, dash: '5,4' }); // 연도선 아래에 깔리도록 맨 앞
+
   legend.innerHTML = [...years].reverse().map((yr, i) =>
-    `<span class="it"><span class="sw" style="background:${SERIES_COLORS[i]}"></span>${yr}년</span>`).join('');
+    `<span class="it"><span class="sw" style="background:${SERIES_COLORS[i]}"></span>${yr}년</span>`).join('') +
+    (hasNorm ? `<span class="it"><span class="sw" style="background:repeating-linear-gradient(90deg,var(--text-3) 0 4px,transparent 4px 7px)"></span>평년(${baseYears[0]}~${baseYears[baseYears.length - 1]} 평균)</span>` : '');
   drawLineChart(cols, series);
 }
 
