@@ -417,11 +417,6 @@
   <div class="card">
     <div class="card-head">
       <div><h2>검역량 추이 <span class="badge gray">톤</span></h2><div class="sub" id="trend-sub"></div></div>
-      <div class="seg-ctl" id="trend-mode">
-        <button data-m="year" class="on">연도 비교</button>
-        <button data-m="country">국가 비교</button>
-        <button data-m="mat">장기 추세</button>
-      </div>
     </div>
     <div class="ychips" id="year-chips"></div>
     <div class="legend" id="trend-legend"></div>
@@ -608,7 +603,7 @@ function renderAll() {
   renderTiles(ym, dataYears);
   renderTrend(ym, dataYears);
   renderPivot(ym, trendYears);
-  renderCountryPivot(trendYears);
+  renderCountryPivot();
   renderCountry();
   renderYearly(ym, dataYears);
   renderHeatmap(ym, dataYears);
@@ -646,7 +641,8 @@ function restoreState() {
     try { src = JSON.parse(localStorage.getItem('impfood.filter')); } catch (e) {}
   }
   if (src) {
-    if (['year', 'country', 'mat'].includes(src._vm)) V.mode = src._vm;
+    // 추이 모드 탭 제거 — 항상 '연도 비교'로 고정 (구 URL/저장값의 country·mat 무시)
+    V.mode = 'year';
     if (Array.isArray(src._yrs) && src._yrs.length) V.years = src._yrs.slice(0, 5);
   }
   applyFilterState(src);
@@ -792,7 +788,7 @@ function exportRows(kind) {
   if (kind === 'cpivot') {
     // 국가별 월별 검역량 원본 수치(kg) — 화면 표와 동일 (전 국가, 국가 필터 무시)
     const recs = filtered(true);
-    const yrs = selectedYears(uniq(recs.map(r => r[6])).sort((a, b) => a - b)).sort((a, b) => b - a);
+    const yrs = uniq(recs.map(r => r[6])).sort((a, b) => b - a).slice(0, 3);
     const rows = [['연도', '국가', ...Array.from({ length: 12 }, (_, i) => (i + 1) + '월'), '합계', '월평균(kg)']];
     const data = new Map();
     for (const r of recs) {
@@ -1151,11 +1147,9 @@ function renderTrendMat(legend) {
   drawLineChart(cols, [{ name: '', color: 'var(--accent)', vals, fill: true, primary: true }], { xLabelStep: 1, endNames: false });
 }
 
-// 모드 토글 + 연도 칩
+// 연도 칩
 function updateTrendControls(dataYears) {
-  document.querySelectorAll('#trend-mode button').forEach(b => b.classList.toggle('on', b.dataset.m === V.mode));
   const chips = document.getElementById('year-chips');
-  if (V.mode !== 'year') { chips.innerHTML = ''; return; }
   const sel = selectedYears(dataYears);
   chips.innerHTML = dataYears.map(y =>
     `<button class="ychip${sel.includes(y) ? ' on' : ''}" data-y="${y}">${y}</button>`).join('');
@@ -1172,11 +1166,6 @@ function updateTrendControls(dataYears) {
     renderAll();
   });
 }
-
-document.querySelectorAll('#trend-mode button').forEach(b => b.onclick = () => {
-  V.mode = b.dataset.m;
-  renderAll();
-});
 
 function bindTrendHover() {
   const svg = document.getElementById('trend-svg');
@@ -1256,11 +1245,11 @@ function renderPivot(ym, years) {
 
 // ---------------------------------------------------------------- 국가별 바
 // ---------------------------------------------------------------- 국가별 월별 검역량 (kg 원본 수치, quarantine식)
-function renderCountryPivot(years) {
+function renderCountryPivot() {
   const tbl = document.getElementById('country-pivot');
   const sub = document.getElementById('cpivot-sub');
   const recs = filtered(true); // 국가 필터는 무시하고 전 국가를 행으로 나열
-  const yrs = [...years].filter(y => recs.some(r => r[6] === y)).sort((a, b) => b - a); // 최신 연도 먼저
+  const yrs = uniq(recs.map(r => r[6])).sort((a, b) => b - a).slice(0, 3); // 최근 3개년 고정
   if (!recs.length || !yrs.length) {
     tbl.innerHTML = '';
     sub.textContent = '선택한 품명·부위 기준 · 국가×월 원본 수치';
