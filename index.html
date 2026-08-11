@@ -284,6 +284,14 @@
   }
   .seg-ctl button:hover { color: var(--text-1); }
   .seg-ctl button.on { background: var(--surface); color: var(--accent-text); box-shadow: var(--shadow-xs); }
+  .tabnav { display: flex; gap: 2px; margin: 2px 0 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .tabnav button {
+    font: inherit; font-size: 14px; font-weight: 600; color: var(--text-3);
+    background: none; border: none; border-bottom: 2px solid transparent;
+    padding: 9px 16px; margin-bottom: -1px; cursor: pointer; transition: color 0.13s ease, border-color 0.13s ease;
+  }
+  .tabnav button:hover { color: var(--text-1); }
+  .tabnav button.on { color: var(--accent-text); border-bottom-color: var(--accent); }
   .ychips { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 10px; }
   .ychips:empty { display: none; }
   .ychip {
@@ -363,7 +371,8 @@
   /* ----- 인쇄 (월간 리포트 모드) ----- */
   .print-header { display: none; }
   @media print {
-    .appbar, .toolbar, .presets, .btn, .card-actions, #ai-card, .tooltip { display: none !important; }
+    .appbar, .toolbar, .presets, .btn, .card-actions, #ai-card, .tooltip, .tabnav { display: none !important; }
+    #view-main, #view-cpivot { display: block !important; }
     body { background: #fff; padding: 0; font-size: 12px; }
     .wrap { max-width: none; padding: 0; }
     .page-head { display: none; }
@@ -403,6 +412,13 @@
   </div>
 
   <div class="print-header" id="print-header"></div>
+
+  <div class="tabnav" id="main-tabs">
+    <button data-view="main" class="on">종합 대시보드</button>
+    <button data-view="cpivot">국가별 월별 검역량</button>
+  </div>
+
+  <div id="view-main">
 
   <div class="presets" id="presets"></div>
 
@@ -458,17 +474,6 @@
     <div class="tbl-scroll"><table class="dt" id="pivot"></table></div>
   </div>
 
-  <div class="card" id="cpivot-card">
-    <div class="card-head">
-      <div><h2>국가별 월별 검역량 <span class="badge gray">kg</span></h2><div class="sub" id="cpivot-sub">선택한 품명·부위 기준 · 국가×월 원본 수치</div></div>
-      <div class="card-actions">
-        <button class="btn sec xs" data-export="cpivot" data-mode="copy">복사</button>
-        <button class="btn sec xs" data-export="cpivot" data-mode="csv">CSV</button>
-      </div>
-    </div>
-    <div class="tbl-scroll"><table class="dt" id="country-pivot"></table></div>
-  </div>
-
   <div class="card">
     <div class="card-head">
       <div><h2>계절성 히트맵 <span class="badge gray">톤</span></h2><div class="sub" id="season-sub"></div></div>
@@ -504,6 +509,21 @@
       <button class="btn" id="ai-send">질문</button>
     </div>
     <div id="ai-answer" class="ai-answer" style="display:none"></div>
+  </div>
+
+  </div><!-- /view-main -->
+
+  <div id="view-cpivot" style="display:none">
+    <div class="card" id="cpivot-card">
+      <div class="card-head">
+        <div><h2>국가별 월별 검역량 <span class="badge gray">kg</span></h2><div class="sub" id="cpivot-sub">선택한 품명·부위 기준 · 국가×월 원본 수치</div></div>
+        <div class="card-actions">
+          <button class="btn sec xs" data-export="cpivot" data-mode="copy">복사</button>
+          <button class="btn sec xs" data-export="cpivot" data-mode="csv">CSV</button>
+        </div>
+      </div>
+      <div class="tbl-scroll"><table class="dt" id="country-pivot"></table></div>
+    </div>
   </div>
 
   <footer>자료: 식약처 수입식품정보(impfood.mfds.go.kr) · 매월 1일·15일 자동 수집</footer>
@@ -544,6 +564,7 @@ async function load() {
   initFilters();
   initAi();
   renderAll();
+  setView(activeView);
 }
 
 // ---------------------------------------------------------------- 필터
@@ -625,9 +646,10 @@ function saveState() {
   for (const [k, s] of FKEYS) if (F[k]) q.set(s, F[k]);
   if (V.mode !== 'year') q.set('vm', V.mode);
   if (V.years && V.years.length) q.set('yrs', V.years.join('.'));
+  if (activeView !== 'main') q.set('tab', activeView);
   const h = q.toString();
   history.replaceState(null, '', h ? '#' + h : location.pathname + location.search);
-  try { localStorage.setItem('impfood.filter', JSON.stringify({ ...F, _vm: V.mode, _yrs: V.years })); } catch (e) {}
+  try { localStorage.setItem('impfood.filter', JSON.stringify({ ...F, _vm: V.mode, _yrs: V.years, _view: activeView })); } catch (e) {}
 }
 
 function restoreState() {
@@ -637,6 +659,7 @@ function restoreState() {
     src = {}; for (const [k, s] of FKEYS) src[k] = q.get(s) || '';
     src._vm = q.get('vm') || 'year';
     src._yrs = q.get('yrs') ? q.get('yrs').split('.').map(Number).filter(Number.isFinite) : null;
+    src._view = q.get('tab') || 'main';
   } else {
     try { src = JSON.parse(localStorage.getItem('impfood.filter')); } catch (e) {}
   }
@@ -644,6 +667,7 @@ function restoreState() {
     // 추이 모드 탭 제거 — 항상 '연도 비교'로 고정 (구 URL/저장값의 country·mat 무시)
     V.mode = 'year';
     if (Array.isArray(src._yrs) && src._yrs.length) V.years = src._yrs.slice(0, 5);
+    if (src._view === 'cpivot') activeView = 'cpivot';
   }
   applyFilterState(src);
 }
@@ -934,6 +958,18 @@ function niceTicks(max, n = 4) {
 // ---------------------------------------------------------------- 추이 라인차트
 let trendState = null; // 공통 스캐폴드 상태: {W,L,R,T,B,n,xOf,cols,series}
 const V = { mode: 'year', years: null }; // 추이 차트 보기 상태 (years: null=최근 4개년 자동, 선택 순서 유지)
+
+// 상단 페이지 탭 (종합 대시보드 / 국가별 월별 검역량)
+let activeView = 'main';
+function setView(v) {
+  activeView = v === 'cpivot' ? 'cpivot' : 'main';
+  document.getElementById('view-main').style.display = activeView === 'main' ? '' : 'none';
+  document.getElementById('view-cpivot').style.display = activeView === 'cpivot' ? '' : 'none';
+  document.querySelectorAll('#main-tabs button').forEach(b => b.classList.toggle('on', b.dataset.view === activeView));
+  saveState();
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll('#main-tabs button').forEach(b => b.onclick = () => setView(b.dataset.view));
 
 // viewBox를 실제 표시 크기에 맞춰 설정 — 글자·점이 왜곡되지 않게 1:1 좌표계 유지
 function fitViewBox(svg, cssH) {
