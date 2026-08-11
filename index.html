@@ -372,7 +372,7 @@
   .print-header { display: none; }
   @media print {
     .appbar, .toolbar, .presets, .btn, .card-actions, #ai-card, .tooltip, .tabnav { display: none !important; }
-    #view-main, #view-cpivot { display: block !important; }
+    #view-main, #view-cpivot, #view-ppivot { display: block !important; }
     body { background: #fff; padding: 0; font-size: 12px; }
     .wrap { max-width: none; padding: 0; }
     .page-head { display: none; }
@@ -416,6 +416,7 @@
   <div class="tabnav" id="main-tabs">
     <button data-view="main" class="on">종합 대시보드</button>
     <button data-view="cpivot">국가별 월별 검역량</button>
+    <button data-view="ppivot">부위별 월별 검역량</button>
   </div>
 
   <div id="view-main">
@@ -465,7 +466,7 @@
 
   <div class="card">
     <div class="card-head">
-      <div><h2>월별 상세 <span class="badge gray">톤</span></h2><div class="sub">위 추이 차트와 동일한 데이터의 표 보기</div></div>
+      <div><h2>월별 상세 <span class="badge gray">톤</span></h2><div class="sub">최근 3개년 월별 검역량</div></div>
       <div class="card-actions">
         <button class="btn sec xs" data-export="pivot" data-mode="copy">복사</button>
         <button class="btn sec xs" data-export="pivot" data-mode="csv">CSV</button>
@@ -523,6 +524,19 @@
         </div>
       </div>
       <div class="tbl-scroll"><table class="dt" id="country-pivot"></table></div>
+    </div>
+  </div>
+
+  <div id="view-ppivot" style="display:none">
+    <div class="card" id="ppivot-card">
+      <div class="card-head">
+        <div><h2>부위별 월별 검역량 <span class="badge gray">kg</span></h2><div class="sub" id="ppivot-sub">선택한 품명·국가 기준 · 부위×월 원본 수치</div></div>
+        <div class="card-actions">
+          <button class="btn sec xs" data-export="ppivot" data-mode="copy">복사</button>
+          <button class="btn sec xs" data-export="ppivot" data-mode="csv">CSV</button>
+        </div>
+      </div>
+      <div class="tbl-scroll"><table class="dt" id="part-pivot"></table></div>
     </div>
   </div>
 
@@ -623,8 +637,9 @@ function renderAll() {
   renderBriefing(ym);
   renderTiles(ym, dataYears);
   renderTrend(ym, dataYears);
-  renderPivot(ym, trendYears);
+  renderPivot(ym, dataYears.slice(-3));
   renderCountryPivot();
+  renderPartPivot();
   renderCountry();
   renderYearly(ym, dataYears);
   renderHeatmap(ym, dataYears);
@@ -667,7 +682,7 @@ function restoreState() {
     // 추이 모드 탭 제거 — 항상 '연도 비교'로 고정 (구 URL/저장값의 country·mat 무시)
     V.mode = 'year';
     if (Array.isArray(src._yrs) && src._yrs.length) V.years = src._yrs.slice(0, 5);
-    if (src._view === 'cpivot') activeView = 'cpivot';
+    if (['cpivot', 'ppivot'].includes(src._view)) activeView = src._view;
   }
   applyFilterState(src);
 }
@@ -803,7 +818,7 @@ function exportRows(kind) {
   if (kind === 'pivot') {
     const recs = filtered();
     const ym = sumByYearMonth(recs);
-    const years = selectedYears(uniq(recs.map(r => r[6])).sort((a, b) => a - b));
+    const years = uniq(recs.map(r => r[6])).sort((a, b) => a - b).slice(-3);
     const rows = [['월', ...years.map(y => y + '년')]];
     for (let m = 1; m <= 12; m++) rows.push([m + '월', ...years.map(y => { const v = ym.get(y * 100 + m); return v !== undefined ? Math.round(v / 1000) : ''; })]);
     rows.push(['합계', ...years.map(y => { let s = 0, n = 0; for (let m = 1; m <= 12; m++) { const v = ym.get(y * 100 + m); if (v !== undefined) { s += v; n++; } } return n ? Math.round(s / 1000) : ''; })]);
@@ -838,6 +853,36 @@ function exportRows(kind) {
     }
     return rows;
   }
+  if (kind === 'ppivot') {
+    // 부위별 월별 검역량 원본 수치(kg) — 화면 표와 동일 (전 부위, 부위 필터 무시)
+    const recs = S.records.filter(r =>
+      r[0] === F.prod && (!F.gubun || r[1] === F.gubun) && (!F.country || r[3] === F.country));
+    const yrs = uniq(recs.map(r => r[6])).sort((a, b) => b - a).slice(0, 3);
+    const rows = [['연도', '부위', ...Array.from({ length: 12 }, (_, i) => (i + 1) + '월'), '합계', '월평균(kg)']];
+    const data = new Map();
+    for (const r of recs) {
+      if (!yrs.includes(r[6])) continue;
+      const key = r[2] + '|' + r[6];
+      if (!data.has(key)) data.set(key, new Array(13).fill(0));
+      data.get(key)[r[5]] += r[4];
+    }
+    for (const y of yrs) {
+      const ps = [...new Set(recs.filter(r => r[6] === y).map(r => r[2]))];
+      const withTot = ps.map(pt => ({ pt, arr: data.get(pt + '|' + y) })).filter(x => x.arr);
+      withTot.forEach(x => x.tot = x.arr.slice(1).reduce((s, v) => s + v, 0));
+      withTot.sort((a, b) => b.tot - a.tot);
+      const mt = new Array(13).fill(0); let yg = 0;
+      for (const { pt, arr, tot } of withTot) {
+        const vm = arr.slice(1).filter(v => v > 0).length || 1;
+        for (let m = 1; m <= 12; m++) mt[m] += arr[m];
+        yg += tot;
+        rows.push([y, pt, ...arr.slice(1).map(v => v || ''), tot, Math.round(tot / vm)]);
+      }
+      const vmt = mt.slice(1).filter(v => v > 0).length || 1;
+      rows.push([y, '소계', ...mt.slice(1).map(v => v || ''), yg, Math.round(yg / vmt)]);
+    }
+    return rows;
+  }
   const recs = filtered(true);
   const ym = sumByYearMonth(recs);
   const last = latestYm(ym);
@@ -858,8 +903,8 @@ function exportFilename(kind) {
     if (S.years.length) parts.push(`${S.years[0]}-${S.years[S.years.length - 1]}`);
     return parts.join('_') + '.csv';
   }
-  const kindLabel = kind === 'country' ? '국가별' : kind === 'cpivot' ? '국가별월별' : '월별';
-  const parts = ['검역통계', kindLabel, F.prod, F.gubun, F.part, kind === 'cpivot' ? '' : F.country].filter(Boolean);
+  const kindLabel = kind === 'country' ? '국가별' : kind === 'cpivot' ? '국가별월별' : kind === 'ppivot' ? '부위별월별' : '월별';
+  const parts = ['검역통계', kindLabel, F.prod, F.gubun, kind === 'ppivot' ? '' : F.part, kind === 'cpivot' ? '' : F.country].filter(Boolean);
   const last = latestYm(sumByYearMonth(filtered()));
   if (last) parts.push(`${Math.floor(last / 100)}-${String(last % 100).padStart(2, '0')}`);
   return parts.join('_') + '.csv';
@@ -961,10 +1006,12 @@ const V = { mode: 'year', years: null }; // 추이 차트 보기 상태 (years: 
 
 // 상단 페이지 탭 (종합 대시보드 / 국가별 월별 검역량)
 let activeView = 'main';
+const VIEWS = ['main', 'cpivot', 'ppivot'];
 function setView(v) {
-  activeView = v === 'cpivot' ? 'cpivot' : 'main';
-  document.getElementById('view-main').style.display = activeView === 'main' ? '' : 'none';
-  document.getElementById('view-cpivot').style.display = activeView === 'cpivot' ? '' : 'none';
+  activeView = VIEWS.includes(v) ? v : 'main';
+  for (const name of VIEWS) {
+    document.getElementById('view-' + name).style.display = activeView === name ? '' : 'none';
+  }
   document.querySelectorAll('#main-tabs button').forEach(b => b.classList.toggle('on', b.dataset.view === activeView));
   saveState();
   window.scrollTo(0, 0);
@@ -1250,7 +1297,7 @@ function renderPivot(ym, years) {
   if (!years.length) { tbl.innerHTML = ''; return; }
   const last = latestYm(ym);
   let html = '<tr><th class="l">월</th>' + years.map(y =>
-    `<th class="ytoggle" data-yy="${y}" title="클릭하면 이 연도를 비교에서 제외">${y}년</th>`).join('') + '</tr>';
+    `<th>${y}년</th>`).join('') + '</tr>';
   for (let m = 1; m <= 12; m++) {
     const isCur = last !== null && m === last % 100;
     const cells = years.map(y => {
@@ -1272,11 +1319,6 @@ function renderPivot(ym, years) {
 
   // 드릴다운: 월 셀 클릭 → 상세, 연도 헤더 클릭 → 비교에서 제외
   tbl.querySelectorAll('td.mclick').forEach(td => td.onclick = () => showMonthDetail(+td.dataset.y, +td.dataset.m));
-  tbl.querySelectorAll('th.ytoggle').forEach(th => th.onclick = () => {
-    if (years.length <= 1) return;
-    V.years = years.filter(x => x !== +th.dataset.yy);
-    renderAll();
-  });
 }
 
 // ---------------------------------------------------------------- 국가별 바
@@ -1352,6 +1394,83 @@ function renderCountryPivot() {
   tbl.querySelectorAll('td.cc').forEach(td => td.onclick = () => {
     F.country = F.country === td.dataset.c ? '' : td.dataset.c;
     document.getElementById('f-country').value = F.country;
+    renderAll();
+  });
+}
+
+// ---------------------------------------------------------------- 부위별 월별 검역량 (부위×월 kg 원본 수치)
+function renderPartPivot() {
+  const tbl = document.getElementById('part-pivot');
+  const sub = document.getElementById('ppivot-sub');
+  // 부위 필터는 무시하고 전 부위를 행으로 나열 (품명·구분·국가 필터는 반영)
+  const recs = S.records.filter(r =>
+    r[0] === F.prod && (!F.gubun || r[1] === F.gubun) && (!F.country || r[3] === F.country));
+  const yrs = uniq(recs.map(r => r[6])).sort((a, b) => b - a).slice(0, 3); // 최근 3개년 고정
+  if (!recs.length || !yrs.length) {
+    tbl.innerHTML = '';
+    sub.textContent = '선택한 품명·국가 기준 · 부위×월 원본 수치';
+    return;
+  }
+
+  // part → year → {month: kg}
+  const data = new Map();
+  for (const r of recs) {
+    const [, , part, , kg, month, year] = r;
+    if (!yrs.includes(year)) continue;
+    if (!data.has(part)) data.set(part, new Map());
+    const ym = data.get(part);
+    if (!ym.has(year)) ym.set(year, {});
+    ym.get(year)[month] = (ym.get(year)[month] ?? 0) + kg;
+  }
+
+  const yearTotal = (part, year) => {
+    const y = data.get(part)?.get(year);
+    return y ? Object.values(y).reduce((s, v) => s + v, 0) : 0;
+  };
+  const grand = part => yrs.reduce((s, y) => s + yearTotal(part, y), 0);
+  const topYear = yrs[0];
+  const parts = [...data.keys()].sort((a, b) =>
+    (yearTotal(b, topYear) - yearTotal(a, topYear)) || (grand(b) - grand(a)) || a.localeCompare(b, 'ko'));
+
+  const cell = v => v ? fmtInt.format(v) : '<span class="na">–</span>';
+  const monthCols = () => Array.from({ length: 12 }, (_, i) => `<th>${i + 1}월</th>`).join('');
+
+  let html = `<tr><th class="l" style="min-width:96px">부위</th>${monthCols()}<th>합계</th><th>월평균<br><small style="font-weight:400;font-size:9px;text-transform:none">실적월</small></th></tr>`;
+
+  for (const y of yrs) {
+    html += `<tr class="yband"><td class="l" colspan="15">${y}년</td></tr>`;
+    const mt = new Array(13).fill(0);
+    let ygrand = 0;
+    for (const pt of parts) {
+      const row = data.get(pt)?.get(y);
+      if (!row) continue;
+      let rt = 0;
+      const cells = [];
+      for (let m = 1; m <= 12; m++) {
+        const v = row[m] || 0;
+        rt += v; mt[m] += v;
+        cells.push(`<td>${cell(v)}</td>`);
+      }
+      ygrand += rt;
+      const vm = Array.from({ length: 12 }, (_, i) => row[i + 1] || 0).filter(v => v > 0).length || 1;
+      const selCls = F.part === pt ? ' class="csel"' : '';
+      html += `<tr${selCls}><td class="l cc" data-p="${pt}" title="클릭하면 ${pt}(으)로 필터">${pt}</td>${cells.join('')}` +
+        `<td>${fmtInt.format(rt)}</td><td>${fmtInt.format(Math.round(rt / vm))}</td></tr>`;
+    }
+    const vmt = mt.slice(1).filter(v => v > 0).length || 1;
+    html += `<tr class="sum"><td class="l">소계</td>` +
+      Array.from({ length: 12 }, (_, i) => `<td>${cell(mt[i + 1])}</td>`).join('') +
+      `<td>${fmtInt.format(ygrand)}</td><td>${fmtInt.format(Math.round(ygrand / vmt))}</td></tr>`;
+  }
+  tbl.innerHTML = html;
+
+  const tag = [F.prod, F.gubun, F.country].filter(Boolean).join(' · ');
+  sub.textContent = `${tag} · ${[...yrs].sort((a, b) => a - b).join(' / ')}년 · 부위×월 원본 수치(kg)`;
+
+  // 부위명 클릭 → 해당 부위로 필터 (재클릭 시 해제)
+  tbl.querySelectorAll('td.cc').forEach(td => td.onclick = () => {
+    F.part = F.part === td.dataset.p ? '' : td.dataset.p;
+    document.getElementById('f-part').value = F.part;
     renderAll();
   });
 }
