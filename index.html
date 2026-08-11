@@ -240,6 +240,8 @@
   table.dt td.na { color: var(--text-4); }
   table.dt tr.sum td { border-top: 2px solid var(--line-strong); font-weight: 700; background: var(--bg-soft); }
   table.dt tr.sum td .part { font-weight: 400; font-size: 10.5px; color: var(--text-3); margin-left: 5px; font-family: var(--font); }
+  /* 월별 상세: 연도(3개년) 숫자 열 가운데 정렬 (월 라벨 열은 좌측 유지) */
+  #pivot th:not(.l), #pivot td:not(.l) { text-align: center; }
   table.dt tr.yband td { background: var(--accent-soft); color: var(--accent-text); font-weight: 700; font-size: 11.5px; text-align: left; font-family: var(--font); letter-spacing: 0.02em; }
   table.dt td.cc { cursor: pointer; }
   table.dt td.cc:hover { color: var(--accent-text); text-decoration: underline; }
