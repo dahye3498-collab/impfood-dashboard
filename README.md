@@ -20,9 +20,13 @@
 └──────────────────────────┘              └───────────────────────┘
 ```
 
-**⚠ 식약처 API는 해외 IP 요청에 응답하지 않으므로** 수집은 반드시 한국 IP(이 PC)에서
-돌아야 합니다. GitHub Actions(미국 러너)로는 불가 — 그래서 수집은 로컬 예약 작업이
-맡고, GitHub은 저장·배포만 담당합니다.
+**⚠ 식약처 API는 해외 IP 요청에 응답하지 않으므로** 수집은 반드시 한국 IP에서
+돌아야 합니다. GitHub Actions(미국 러너)로는 불가.
+
+> **권장: Google Apps Script 자동수집** — GAS는 구글 서버에서 돌아 식약처 API에 접근이
+> 되므로(구 GAS 시스템이 이 방식이었음), 매월 API를 호출해 `data/`에 직접 커밋하게 하면
+> **로컬 PC·예약작업 없이 완전 자동**이 된다. 셋업: [`google-apps-script/`](google-apps-script/).
+> (아래 로컬 윈도우 PC 예약작업 방식은 GAS를 안 쓸 때의 대안.)
 
 - 예약 작업 이름: `impfood-collect-1일`, `impfood-collect-15일` (작업 스케줄러)
 - 1일 실행 = 전월 첫 수집, 15일 실행 = 전월 재수집(뒤늦게 정정된 데이터 반영)
@@ -38,7 +42,8 @@ data/fta.json                  FTA 할당관세 — 수동 관리
 data/config.json               AI 질문 기능 설정 (ai_endpoint)
 index.html                     대시보드 전체 (정적 단일 파일, 빌드 불필요)
 parser.html                    부산물 업로드 파서 (브라우저에서 QIA 엑셀 → data JSON, 설치 불필요)
-scripts/collect.mjs            정육 수집기 (식약처 API, 자동)
+google-apps-script/Code.gs     정육 자동수집 (GAS: 식약처 API → GitHub 직접 커밋, PC 불필요) ★권장
+scripts/collect.mjs            정육 수집기 (식약처 API, 로컬 Node — GAS 대안)
 scripts/collect-byproducts.mjs 부산물 수집기 (QIA 엑셀 → 해당월 교체, 수동)
 scripts/store.mjs              데이터 저장 공통 모듈
 scripts/monthly-collect.ps1    예약 작업이 실행하는 스크립트 (수집→커밋→푸시)
