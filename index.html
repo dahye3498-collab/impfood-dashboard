@@ -76,6 +76,8 @@
   .appbar .brand .hl { color: var(--accent-text); }
   .appbar .spacer { flex: 1; }
   .appbar .meta { color: var(--text-3); font-size: 12px; font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; margin-left: 12px; }
+  .appbar .admin-link { font-size: 12px; font-weight: 600; color: var(--accent-text); background: var(--accent-soft); border: 1px solid var(--accent-soft-2); border-radius: 20px; padding: 4px 12px; text-decoration: none; white-space: nowrap; margin-left: 10px; transition: background 0.13s ease; }
+  .appbar .admin-link:hover { background: var(--accent-soft-2); }
 
   .wrap { max-width: 1280px; margin: 0 auto; padding: 16px 24px 44px; }
 
@@ -392,6 +394,7 @@
 <div class="appbar">
   <div class="brand"><span class="mark">검</span><span class="hl">검역통계</span></div>
   <div class="spacer"></div>
+  <a class="admin-link" id="admin-parser" href="parser.html" title="QIA 부산물 엑셀 업로드 (담당자용)" hidden>부산물 업로드</a>
   <div class="meta" id="meta">데이터 불러오는 중...</div>
 </div>
 
@@ -1916,6 +1919,24 @@ new ResizeObserver(queueRerender).observe(document.getElementById('trend-box'));
 load().catch(err => {
   document.getElementById('meta').textContent = '데이터 로드 실패: ' + err.message;
 });
+
+// ── 담당자 전용: '부산물 업로드' 링크는 이 기기에서 켠 경우에만 표시 ──────────
+// 켜기: 주소 뒤 #admin (또는 ?admin) 한 번 방문 → 이 브라우저에 저장. 끄기: #admin=off
+// 파서에 토큰을 저장(localStorage)해둔 담당자는 자동으로 보임.
+function applyAdminGate(){
+  const KEY='impfood.admin';
+  try{
+    const s=(location.search+' '+location.hash).toLowerCase();
+    if(/admin=off/.test(s)) localStorage.removeItem(KEY);
+    else if(/admin(=on|=1)?(\b|&|$)/.test(s)) localStorage.setItem(KEY,'1');
+  }catch(e){}
+  let on=false;
+  try{ on = localStorage.getItem(KEY)==='1' || !!localStorage.getItem('impfood.gh_token'); }catch(e){}
+  const el=document.getElementById('admin-parser');
+  if(el) el.hidden=!on;
+}
+applyAdminGate();
+window.addEventListener('hashchange', applyAdminGate);
 </script>
 </body>
 </html>
