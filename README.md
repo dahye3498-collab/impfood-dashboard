@@ -37,6 +37,7 @@ data/manifest.json             연도 목록·갱신일시 (수집기가 자동 
 data/fta.json                  FTA 할당관세 — 수동 관리
 data/config.json               AI 질문 기능 설정 (ai_endpoint)
 index.html                     대시보드 전체 (정적 단일 파일, 빌드 불필요)
+parser.html                    부산물 업로드 파서 (브라우저에서 QIA 엑셀 → data JSON, 설치 불필요)
 scripts/collect.mjs            정육 수집기 (식약처 API, 자동)
 scripts/collect-byproducts.mjs 부산물 수집기 (QIA 엑셀 → 해당월 교체, 수동)
 scripts/store.mjs              데이터 저장 공통 모듈
@@ -109,10 +110,19 @@ wtCnt6). 1월에는 둘이 같아서 혼동하기 쉽습니다. 구 GAS 백필�
   **사용률(usage_pct)을 갱신할 때 확인 날짜(as_of)도 함께 수정**해야 소진 예측이 맞습니다.
 - **소부산물·돼지부산물**: 식약처 API에 없어 자동 수집 불가. 농림축산검역본부 QIA
   (https://eminwon.qia.go.kr/statistics/statistics_No2.do)에서 매달 수동 반영한다.
-  1. QIA: 통계분류=수입축산물, 품목=육류, **검사기간=해당월~해당월(반드시 단월)** → 엑셀 다운로드
-  2. `node scripts/collect-byproducts.mjs <다운받은.xls> <연도> <월>` (미리보기는 `--dry`)
-  3. `git add data && git commit && git push`
-  - ⚠ 검사기간을 단월로 두지 않으면 누계(YTD)가 그 달 값으로 들어가 오염된다(스크립트가 자동 차단).
+  QIA 다운로드: 통계분류=수입축산물, 품목=육류, **품목·국가별 수출입현황**,
+  **검사기간=해당월~해당월(반드시 단월)** → 엑셀 다운로드. 이후 두 방법 중 하나:
+
+  **방법 A — 브라우저 파서 (설치·명령어 불필요, 담당자 권장)**
+  1. 대시보드 주소 뒤에 `/parser.html` (예: `<소유자>.github.io/impfood-dashboard/parser.html`) 열기
+  2. 받은 엑셀을 드래그&드롭 → 연·월 자동 인식 + 파싱·검증 미리보기
+  3. `quarantine-<연도>.json`(과 `manifest.json`) 다운로드 → GitHub 저장소 `data/`에
+     올려 덮어쓰기 커밋 → 1분 내 자동 반영. (결과는 아래 스크립트와 100% 동일)
+
+  **방법 B — 로컬 스크립트 (Node 환경)**
+  1. `node scripts/collect-byproducts.mjs <다운받은.xls> <연도> <월>` (미리보기는 `--dry`)
+  2. `git add data && git commit && git push`
+  - ⚠ 검사기간을 단월로 두지 않으면 누계(YTD)가 그 달 값으로 들어가 오염된다(파서·스크립트 모두 자동 차단).
   - 추적 부위: (소) 안창토시·우건·꼬리·볼살·깐양홍창·곱창대창·뼈 / (돼지) 갈매기·돼지머리·장족단족·목뼈등뼈·곱창막창.
     QIA 품명↔부위 매핑은 스크립트 상단에 있음. 물량 적은 부위(우족·소간·소심장 등)는 의도적으로 제외.
 
