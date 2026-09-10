@@ -116,8 +116,12 @@ wtCnt6). 1월에는 둘이 같아서 혼동하기 쉽습니다. 구 GAS 백필�
   **방법 A — 브라우저 파서 (설치·명령어 불필요, 담당자 권장)**
   1. 대시보드 주소 뒤에 `/parser.html` (예: `<소유자>.github.io/impfood-dashboard/parser.html`) 열기
   2. 받은 엑셀을 드래그&드롭 → 연·월 자동 인식 + 파싱·검증 미리보기
-  3. `quarantine-<연도>.json`(과 `manifest.json`) 다운로드 → GitHub 저장소 `data/`에
-     올려 덮어쓰기 커밋 → 1분 내 자동 반영. (결과는 아래 스크립트와 100% 동일)
+  3. 반영: 두 가지 중 하나
+     - **자동 커밋(권장)**: "GitHub 연결"에 파인그레인드 토큰(이 저장소·Contents 쓰기)을
+       1회 저장 → **[GitHub에 바로 커밋]** 한 번이면 `data/` 두 파일을 한 커밋으로
+       올리고 1분 내 자동 반영. 토큰은 그 브라우저에만 저장(개인 PC 권장, "토큰 지우기" 버튼 있음).
+     - **수동**: `quarantine-<연도>.json`(과 `manifest.json`) 다운로드 → GitHub `data/`에 덮어쓰기 커밋
+     - (파서 결과는 아래 스크립트와 바이트 단위 100% 동일)
 
   **방법 B — 로컬 스크립트 (Node 환경)**
   1. `node scripts/collect-byproducts.mjs <다운받은.xls> <연도> <월>` (미리보기는 `--dry`)

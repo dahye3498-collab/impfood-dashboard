@@ -52,6 +52,20 @@
   a{color:var(--accent-text)}
   .muted{color:var(--text-3);font-size:12.5px}
   .pill{display:inline-block;background:var(--accent-soft);color:var(--accent-text);border-radius:20px;padding:2px 10px;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+  .field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+  .field label{font-size:12px;color:var(--text-3);font-weight:600}
+  .field input[type=text],.field input[type=password]{font-family:var(--font-mono);font-size:13px;border:1px solid var(--line-strong);border-radius:8px;padding:8px 11px;background:var(--surface);color:var(--text-1);width:100%}
+  .field input:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+  .row-inputs{display:flex;gap:10px;flex-wrap:wrap}
+  .row-inputs .field{flex:1;min-width:120px}
+  .check{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-2);margin:2px 0 10px;cursor:pointer}
+  .conn-status{font-size:12.5px;font-weight:600}
+  .conn-status.on{color:var(--accent-text)} .conn-status.off{color:var(--text-3)}
+  details.help{margin-top:8px;font-size:12.5px;color:var(--text-2)}
+  details.help summary{cursor:pointer;color:var(--accent-text);font-weight:600}
+  details.help ol{margin-top:6px}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--accent-soft);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}
   [hidden]{display:none!important}
 </style>
 </head>
@@ -71,7 +85,33 @@
   </div>
 
   <div class="card">
-    <h2><span class="step-num">2</span>파일 올리기</h2>
+    <h2><span class="step-num">2</span>GitHub 연결 <span class="muted" style="font-weight:400">· 자동 커밋용 (1회 설정)</span></h2>
+    <div class="row-inputs">
+      <div class="field"><label>소유자(owner)</label><input type="text" id="gh-owner" placeholder="dahye3498-collab"></div>
+      <div class="field"><label>저장소(repo)</label><input type="text" id="gh-repo" placeholder="impfood-dashboard"></div>
+      <div class="field" style="max-width:110px"><label>브랜치</label><input type="text" id="gh-branch" value="main"></div>
+    </div>
+    <div class="field"><label>토큰 (fine-grained, 이 저장소 · Contents 쓰기)</label><input type="password" id="gh-token" placeholder="github_pat_..." autocomplete="off"></div>
+    <label class="check"><input type="checkbox" id="gh-save"> 이 기기 브라우저에 토큰 저장 (개인 PC에서만 권장)</label>
+    <div class="btn-row">
+      <button class="btn" id="gh-connect">연결 저장</button>
+      <button class="btn" id="gh-clear">토큰 지우기</button>
+      <span class="conn-status off" id="gh-status" style="align-self:center">미연결</span>
+    </div>
+    <details class="help">
+      <summary>토큰 발급 방법 (약 1분)</summary>
+      <ol>
+        <li>GitHub → Settings → Developer settings → <b>Fine-grained personal access tokens</b> → Generate new token</li>
+        <li>Repository access → <b>Only select repositories</b> → 이 저장소 선택</li>
+        <li>Permissions → Repository permissions → <b>Contents: Read and write</b> (그 외 불필요)</li>
+        <li>만료일 지정 후 생성 → <code>github_pat_...</code> 복사해서 위에 붙여넣기</li>
+      </ol>
+      <div class="muted">토큰은 이 브라우저에만 저장되고 다른 서버로 전송되지 않습니다(GitHub API로만). 공용 PC라면 "저장" 체크는 끄세요.</div>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2><span class="step-num">3</span>파일 올리기</h2>
     <label class="drop" id="drop">
       <b>여기로 엑셀(.xls)을 끌어다 놓기</b>
       <span>또는 클릭해서 선택</span>
@@ -81,22 +121,29 @@
   </div>
 
   <div class="card" id="preview-card" hidden>
-    <h2><span class="step-num">3</span>미리보기 · 검증</h2>
+    <h2><span class="step-num">4</span>미리보기 · 검증</h2>
     <div id="preview"></div>
   </div>
 
   <div class="card" id="download-card" hidden>
-    <h2><span class="step-num">4</span>파일 받아서 커밋</h2>
+    <h2><span class="step-num">5</span>반영하기</h2>
     <div class="btn-row">
-      <button class="btn pri" id="dl-year">quarantine-연도.json 다운로드</button>
-      <button class="btn" id="dl-manifest">manifest.json 다운로드</button>
+      <button class="btn pri" id="gh-commit">GitHub에 바로 커밋</button>
     </div>
-    <ol>
-      <li><b>quarantine-연도.json</b>을 받아 GitHub 저장소 <code>data/</code> 폴더에 올리세요 (기존 파일 위에 덮어쓰기 — 웹에서 <b>Add file → Upload files</b>로 드래그).</li>
-      <li>같이 받은 <b>manifest.json</b>도 <code>data/</code>에 올리면 대시보드 "갱신" 날짜가 오늘로 바뀝니다 (선택).</li>
-      <li>아래 <b>Commit changes</b>로 커밋하면 1분 내 대시보드에 자동 반영됩니다.</li>
-    </ol>
-    <div class="muted" id="repo-hint" style="margin-top:6px"></div>
+    <div id="commit-msg"></div>
+    <details class="help" style="margin-top:12px">
+      <summary>토큰 없이 수동으로 (다운로드 → 웹 업로드)</summary>
+      <div class="btn-row" style="margin-top:8px">
+        <button class="btn" id="dl-year">quarantine-연도.json 다운로드</button>
+        <button class="btn" id="dl-manifest">manifest.json 다운로드</button>
+      </div>
+      <ol>
+        <li><b>quarantine-연도.json</b>을 받아 GitHub 저장소 <code>data/</code>에 올려 덮어쓰기 (<b>Add file → Upload files</b>로 드래그).</li>
+        <li><b>manifest.json</b>도 <code>data/</code>에 올리면 "갱신" 날짜가 최신화됩니다 (선택).</li>
+        <li><b>Commit changes</b> → 1분 내 자동 반영.</li>
+      </ol>
+      <div class="muted" id="repo-hint"></div>
+    </details>
   </div>
 </div>
 
@@ -264,6 +311,98 @@ function download(name,text){
 }
 $('dl-year').addEventListener('click',()=>{ if(OUT)download(`quarantine-${OUT.year}.json`,OUT.yearJson); });
 $('dl-manifest').addEventListener('click',()=>{ if(OUT&&OUT.manifestJson)download('manifest.json',OUT.manifestJson); });
+
+// ── GitHub 연결 & 자동 커밋 ───────────────────────────────────────────────
+const TK='impfood.gh_token', RK='impfood.gh_repo';
+function safeGet(store,k){ try{return store.getItem(k)||'';}catch(e){return '';} }
+function getToken(){ return safeGet(sessionStorage,TK) || safeGet(localStorage,TK); }
+function detectRepo(){
+  const h=location.hostname, parts=location.pathname.split('/').filter(Boolean);
+  if(h.endsWith('.github.io')) return {owner:h.replace('.github.io',''), repo:parts[0]||''};
+  return {owner:'',repo:''};
+}
+function updateConnStatus(){
+  const el=$('gh-status'), ok=getToken() && $('gh-owner').value.trim() && $('gh-repo').value.trim();
+  el.textContent = ok ? '연결됨' : '미연결';
+  el.className = 'conn-status '+(ok?'on':'off');
+}
+(function initConn(){
+  const det=detectRepo();
+  let saved={}; try{ saved=JSON.parse(safeGet(localStorage,RK)||'{}'); }catch(e){}
+  $('gh-owner').value = saved.owner || det.owner || '';
+  $('gh-repo').value  = saved.repo  || det.repo  || '';
+  $('gh-branch').value= saved.branch|| 'main';
+  const tk=getToken(); if(tk){ $('gh-token').value=tk; $('gh-save').checked=!!safeGet(localStorage,TK); }
+  updateConnStatus();
+})();
+$('gh-connect').addEventListener('click',()=>{
+  const tok=$('gh-token').value.trim();
+  try{
+    sessionStorage.setItem(TK,tok);
+    if($('gh-save').checked) localStorage.setItem(TK,tok); else localStorage.removeItem(TK);
+    localStorage.setItem(RK,JSON.stringify({owner:$('gh-owner').value.trim(),repo:$('gh-repo').value.trim(),branch:$('gh-branch').value.trim()||'main'}));
+  }catch(e){}
+  updateConnStatus();
+  showMsg($('commit-msg'), tok?'ok':'warn', tok?'연결 저장됨.':'토큰이 비어 있습니다.');
+});
+$('gh-clear').addEventListener('click',()=>{
+  try{ sessionStorage.removeItem(TK); localStorage.removeItem(TK); }catch(e){}
+  $('gh-token').value=''; $('gh-save').checked=false; updateConnStatus();
+  showMsg($('commit-msg'),'ok','토큰을 지웠습니다.');
+});
+['gh-owner','gh-repo','gh-token'].forEach(id=>$(id).addEventListener('input',updateConnStatus));
+
+function b64utf8(str){
+  const bytes=new TextEncoder().encode(str); let bin=''; const CH=0x8000;
+  for(let i=0;i<bytes.length;i+=CH) bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+CH));
+  return btoa(bin);
+}
+async function ghApi(token,path,opts={}){
+  const r=await fetch('https://api.github.com'+path,{...opts,headers:{
+    'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json',
+    'X-GitHub-Api-Version':'2022-11-28',...(opts.body?{'Content-Type':'application/json'}:{})}});
+  const txt=await r.text(); let j={}; try{ j=txt?JSON.parse(txt):{}; }catch(e){}
+  if(!r.ok) throw new Error(`${r.status} ${j.message||r.statusText}`);
+  return j;
+}
+// 여러 파일을 한 커밋으로 (Git Data API)
+async function commitFiles(token,owner,repo,branch,files,message){
+  const ref=await ghApi(token,`/repos/${owner}/${repo}/git/ref/heads/${branch}`);
+  const latest=ref.object.sha;
+  const commit=await ghApi(token,`/repos/${owner}/${repo}/git/commits/${latest}`);
+  const tree=[];
+  for(const f of files){
+    const blob=await ghApi(token,`/repos/${owner}/${repo}/git/blobs`,{method:'POST',body:JSON.stringify({content:b64utf8(f.content),encoding:'base64'})});
+    tree.push({path:f.path,mode:'100644',type:'blob',sha:blob.sha});
+  }
+  const newTree=await ghApi(token,`/repos/${owner}/${repo}/git/trees`,{method:'POST',body:JSON.stringify({base_tree:commit.tree.sha,tree})});
+  const newCommit=await ghApi(token,`/repos/${owner}/${repo}/git/commits`,{method:'POST',body:JSON.stringify({message,tree:newTree.sha,parents:[latest]})});
+  await ghApi(token,`/repos/${owner}/${repo}/git/refs/heads/${branch}`,{method:'PATCH',body:JSON.stringify({sha:newCommit.sha})});
+  return newCommit;
+}
+$('gh-commit').addEventListener('click',async()=>{
+  if(!OUT) return;
+  const token=getToken(), owner=$('gh-owner').value.trim(), repo=$('gh-repo').value.trim(), branch=$('gh-branch').value.trim()||'main';
+  if(!token) return showMsg($('commit-msg'),'err','토큰이 없습니다. 위 <b>GitHub 연결</b>에서 토큰을 저장하세요.');
+  if(!owner||!repo) return showMsg($('commit-msg'),'err','소유자/저장소를 입력하세요.');
+  const files=[{path:`data/quarantine-${OUT.year}.json`,content:OUT.yearJson}];
+  if(OUT.manifestJson) files.push({path:'data/manifest.json',content:OUT.manifestJson});
+  const btn=$('gh-commit'); btn.disabled=true;
+  showMsg($('commit-msg'),'ok','<span class="spin"></span>커밋 중…');
+  try{
+    const msg=`부산물 수집: ${OUT.year}-${String(OUT.month).padStart(2,'0')} (parser.html)`;
+    const c=await commitFiles(token,owner,repo,branch,files,msg);
+    const url=`https://github.com/${owner}/${repo}/commit/${c.sha}`;
+    showMsg($('commit-msg'),'ok',`✅ 커밋 완료 — <a href="${url}" target="_blank" rel="noopener">${c.sha.slice(0,7)}</a> · 1분 내 대시보드 자동 반영됩니다.`);
+  }catch(e){
+    let hint=e.message;
+    if(/^401/.test(hint)) hint='토큰이 잘못됐거나 만료됨 (401). 새 토큰을 발급하세요.';
+    else if(/^403/.test(hint)) hint='권한 부족 또는 호출 제한 (403). 토큰에 이 저장소 Contents 쓰기 권한이 있는지 확인하세요.';
+    else if(/^404/.test(hint)) hint='저장소/브랜치를 찾을 수 없음 (404). 소유자·저장소·브랜치와 토큰의 저장소 접근 범위를 확인하세요.';
+    else if(/^409/.test(hint)) hint='그새 다른 커밋이 있었습니다 (409). 페이지 새로고침 후 다시 시도하세요.';
+    showMsg($('commit-msg'),'err','커밋 실패: '+hint);
+  }finally{ btn.disabled=false; }
+});
 </script>
 </body>
 </html>
