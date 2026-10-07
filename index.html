@@ -248,6 +248,10 @@
   table.dt td.cc { cursor: pointer; }
   table.dt td.cc:hover { color: var(--accent-text); text-decoration: underline; }
   table.dt tr.csel td { background: var(--accent-soft); font-weight: 600; }
+  /* 국가별·부위별 월별 표: 15열(국가/부위 + 12개월 + 합계·월평균)이라 넓음 — 촘촘하게 */
+  #country-pivot, #part-pivot { font-size: 11px; }
+  #country-pivot th, #country-pivot td, #part-pivot th, #part-pivot td { padding: 3px 5px; }
+  #country-pivot th.l, #country-pivot td.l, #part-pivot th.l, #part-pivot td.l { min-width: 0; }
 
   /* ----- FTA ----- */
   .fta-rows { margin-top: 10px; display: flex; flex-direction: column; gap: 7px; }
